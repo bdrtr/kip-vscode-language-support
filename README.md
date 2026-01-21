@@ -1,22 +1,34 @@
 # Kip - Turkish Programming Language Extension
 
-[![Build Extension](https://github.com/kip-dili/kip/actions/workflows/build-extension.yml/badge.svg)](https://github.com/kip-dili/kip/actions/workflows/build-extension.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/kip-dili/kip/releases)
+[![Build Extension](https://github.com/bdrtr/kip-vscode-language-support/actions/workflows/build-extension.yml/badge.svg)](https://github.com/bdrtr/kip-vscode-language-support/actions/workflows/build-extension.yml)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/bdrtr/kip-vscode-language-support/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/algorynth.kip-language?label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)
 
 Türkçe tabanlı programlama dili **Kip** için profesyonel Visual Studio Code eklentisi.
 
+> **Not:** Bu topluluk tarafından geliştirilmiş bir eklentidir. Resmi Kip dil eklentisi değildir.
+
 ## 📥 Kurulum
 
-### Marketplace'ten (Önerilen)
+### 🌐 VS Code Marketplace (Önerilen)
+
+Eklenti artık **[VS Code Marketplace'te yayında](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)**!
+
 ```bash
 code --install-extension algorynth.kip-language
 ```
 
-### VSIX Dosyası ile
+Veya VS Code içinden:
+1. Extensions panelini açın (`Ctrl+Shift+X`)
+2. "Kip" araması yapın
+3. "Kip - Turkish Programming Language" eklentisini bulun
+4. **Install** butonuna tıklayın
+
+### 📦 VSIX Dosyası ile (GitHub)
 En son sürümü GitHub Actions'tan indirebilirsiniz:
 
-**[📦 Son VSIX İndir](https://github.com/kip-dili/kip/actions/workflows/build-extension.yml)** → En son başarılı build → Artifacts → `kip-language-vsix`
+**[Son VSIX İndir](https://github.com/bdrtr/kip-vscode-language-support/actions/workflows/build-extension.yml)** → En son başarılı build → Artifacts → `kip-language-vsix`
 
 Sonra yükleyin:
 ```bash
@@ -181,23 +193,11 @@ MIT License - detaylar için [LICENSE](LICENSE) dosyasına bakın.
 
 ## 🔗 Bağlantılar
 
-- **Ana Repo:** [github.com/kip-dili/kip](https://github.com/kip-dili/kip)
+- **VS Code Marketplace:** [algorynth.kip-language](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)
+- **Extension Repo:** [github.com/bdrtr/kip-vscode-language-support](https://github.com/bdrtr/kip-vscode-language-support)
+- **Kip Dili Repo:** [github.com/kip-dili/kip](https://github.com/kip-dili/kip)
 - **Dokümantasyon:** [Kip Dili Rehberi](https://github.com/kip-dili/kip#readme)
-- **Issues:** [GitHub Issues](https://github.com/kip-dili/kip/issues)
-- **Marketplace:** [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)
-
----
-
-## 📸 Ekran Görüntüleri
-
-### Syntax Highlighting & Error Detection
-![Syntax highlighting with error detection](images/screenshot1.png)
-
-### Outline View & Navigation
-![Outline and breadcrumbs](images/screenshot2.png)
-
-### Code Completion
-![Auto-completion in action](images/screenshot3.png)
+- **Issues:** [GitHub Issues](https://github.com/bdrtr/kip-vscode-language-support/issues)
 
 ---
 
