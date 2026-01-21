@@ -1,0 +1,110 @@
+{
+    "name": "kip-language",
+    "displayName": "Kip Language Support",
+    "description": "Kip programlama dili için VS Code desteği - Türkçe dilbilgisi tabanlı programlama",
+    "version": "0.2.0",
+    "publisher": "kip-dili",
+    "icon": "images/icon.png",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/kip-dili/kip.git"
+    },
+    "bugs": {
+        "url": "https://github.com/kip-dili/kip/issues"
+    },
+    "homepage": "https://github.com/kip-dili/kip#readme",
+    "license": "MIT",
+    "engines": {
+        "vscode": "^1.108.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "keywords": [
+        "kip",
+        "turkish",
+        "türkçe",
+        "programlama",
+        "functional"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "kip",
+                "aliases": [
+                    "Kip",
+                    "kip"
+                ],
+                "extensions": [
+                    ".kip"
+                ],
+                "configuration": "./language-configuration.json",
+                "icon": {
+                    "light": "./images/icon.png",
+                    "dark": "./images/icon.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "kip",
+                "scopeName": "source.kip",
+                "path": "./syntaxes/kip.tmLanguage.json"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "kip",
+                "path": "./snippets/kip.json"
+            }
+        ],
+        "commands": [
+            {
+                "command": "kip.runFile",
+                "title": "Run Kip File",
+                "category": "Kip",
+                "icon": "$(play)"
+            }
+        ],
+        "menus": {
+            "editor/title/run": [
+                {
+                    "command": "kip.runFile",
+                    "when": "resourceLangId == kip",
+                    "group": "navigation"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "kip.runFile",
+                    "when": "resourceLangId == kip",
+                    "group": "navigation"
+                }
+            ]
+        },
+        "keybindings": [
+            {
+                "command": "kip.runFile",
+                "key": "ctrl+shift+r",
+                "mac": "cmd+shift+r",
+                "when": "resourceLangId == kip"
+            }
+        ]
+    },
+    "main": "./out/extension.js",
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile",
+        "lint": "eslint src --ext ts",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "",
+    "devDependencies": {
+        "@types/node": "^25.0.9",
+        "@types/vscode": "^1.108.1",
+        "typescript": "^5.9.3"
+    },
+    "dependencies": {}
+}

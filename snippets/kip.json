@@ -1,0 +1,162 @@
+{
+    "Type Definition": {
+        "prefix": "type",
+        "body": [
+            "Bir ${1:tip-adı}",
+            "ya ${2:yapıcı1}",
+            "ya da ${3:yapıcı2}",
+            "olabilir."
+        ],
+        "description": "Yeni bir tip tanımı"
+    },
+    "Polymorphic Type": {
+        "prefix": "polytype",
+        "body": [
+            "Bir (${1:öğe} ${2:tip-adı})",
+            "ya ${3:yapıcı1}",
+            "ya da ${4:yapıcı2}",
+            "olabilir."
+        ],
+        "description": "Çokbiçimli tip tanımı"
+    },
+    "Function Definition": {
+        "prefix": "func",
+        "body": [
+            "(${1:bu} ${2:tip}${3:i}) ${4:fonksiyon-adı},",
+            "  ${5:gövde}."
+        ],
+        "description": "Fonksiyon tanımı"
+    },
+    "Function with Two Parameters": {
+        "prefix": "func2",
+        "body": [
+            "(${1:bu} ${2:tip1}${3:i}) (${4:şu} ${5:tip2}${6:i}) ${7:fonksiyon-adı},",
+            "  ${8:gövde}."
+        ],
+        "description": "İki parametreli fonksiyon"
+    },
+    "Pattern Matching": {
+        "prefix": "match",
+        "body": [
+            "${1:değer}",
+            "  ${2:örüntü1}sa,",
+            "    ${3:sonuç1},",
+            "  ${4:örüntü2}sa,",
+            "    ${5:sonuç2},",
+            "  değilse,",
+            "    ${6:varsayılan}."
+        ],
+        "description": "Örüntü eşleştirme"
+    },
+    "Conditional": {
+        "prefix": "if",
+        "body": [
+            "${1:koşul} doğruysa,",
+            "  ${2:doğru-durumu},",
+            "yanlışsa,",
+            "  ${3:yanlış-durumu}."
+        ],
+        "description": "Koşullu ifade"
+    },
+    "List Type": {
+        "prefix": "list",
+        "body": [
+            "Bir (${1:öğe} listesi)",
+            "ya boş",
+            "ya da bir ${1:öğe}nin bir ${1:öğe} listesine eki",
+            "olabilir."
+        ],
+        "description": "Liste tipi tanımı"
+    },
+    "Maybe Type": {
+        "prefix": "maybe",
+        "body": [
+            "Bir (${1:öğe}nin olasılığı)",
+            "ya yokluğu",
+            "ya da bir ${1:öğe}nin varlığı",
+            "olabilir."
+        ],
+        "description": "Olasılık tipi (Maybe)"
+    },
+    "Print": {
+        "prefix": "print",
+        "body": [
+            "${1:değer}i yaz."
+        ],
+        "description": "Yazdırma"
+    },
+    "Read": {
+        "prefix": "read",
+        "body": [
+            "${1:isim} olarak okuyup,"
+        ],
+        "description": "Okuma"
+    },
+    "Sequencing": {
+        "prefix": "seq",
+        "body": [
+            "${1:işlem1}ip,",
+            "${2:işlem2}."
+        ],
+        "description": "İşlem sıralaması"
+    },
+    "Constant Definition": {
+        "prefix": "const",
+        "body": [
+            "${1:değer}e ${2:isim} diyelim."
+        ],
+        "description": "Sabit tanımı"
+    },
+    "Primitive Type": {
+        "prefix": "primitive",
+        "body": [
+            "Bir yerleşik ${1:tip-adı} olsun."
+        ],
+        "description": "Yerleşik tip tanımı"
+    },
+    "Comment Block": {
+        "prefix": "comment",
+        "body": [
+            "(* ${1:açıklama} *)"
+        ],
+        "description": "Yorum bloğu"
+    },
+    "Fibonacci Example": {
+        "prefix": "fibonacci",
+        "body": [
+            "(* İlk n Fibonacci sayısını yazdırır. *)",
+            "(bu tam-sayıyı) (şu tam-sayıyı) (o tam-sayıyı) işlemek,",
+            "  (onla 0'ın eşitliği) doğruysa,",
+            "    durmaktır,",
+            "  yanlışsa,",
+            "    bunu yazıp,",
+            "    şunu (bunla şunun toplamını) (onla 1'in farkını) işlemektir.",
+            "",
+            "çalıştırmak,",
+            "  \"Bir sayı girin:\" yazıp,",
+            "  isim olarak okuyup,",
+            "  ((ismin tam-sayı-hali)",
+            "    yokluksa,",
+            "      \"Geçersiz sayı.\" yazmaktır,",
+            "    n'nin varlığıysa,",
+            "      0'ı 1'i n'yi işlemektir).",
+            "",
+            "çalıştır."
+        ],
+        "description": "Fibonacci örnek programı"
+    },
+    "Natural Number Type": {
+        "prefix": "nat",
+        "body": [
+            "Bir doğal-sayı ya sıfır ya da bir doğal-sayının ardılı olabilir."
+        ],
+        "description": "Doğal sayı tipi"
+    },
+    "Boolean Type": {
+        "prefix": "bool",
+        "body": [
+            "Bir doğruluk ya doğru ya da yanlış olabilir."
+        ],
+        "description": "Boolean tipi"
+    }
+}
