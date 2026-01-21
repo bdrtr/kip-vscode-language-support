@@ -15,7 +15,7 @@
     "homepage": "https://github.com/kip-dili/kip#readme",
     "license": "MIT",
     "engines": {
-        "vscode": "^1.108.0"
+        "vscode": "^1.70.0"
     },
     "categories": [
         "Programming Languages"
@@ -26,6 +26,9 @@
         "türkçe",
         "programlama",
         "functional"
+    ],
+    "activationEvents": [
+        "onLanguage:kip"
     ],
     "contributes": {
         "languages": [
@@ -102,9 +105,10 @@
     },
     "author": "",
     "devDependencies": {
-        "@types/node": "^25.0.9",
-        "@types/vscode": "^1.108.1",
-        "typescript": "^5.9.3"
+        "@types/node": "^20.0.0",
+        "@types/vscode": "^1.70.0",
+        "typescript": "^5.0.0",
+        "@vscode/vsce": "^2.20.0"
     },
     "dependencies": {}
 }
