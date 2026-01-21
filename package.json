@@ -1,9 +1,9 @@
 {
     "name": "kip-language",
-    "displayName": "Kip Language Support",
+    "displayName": "Kip - Turkish Programming Language",
     "description": "Kip programlama dili için VS Code desteği - Türkçe dilbilgisi tabanlı programlama",
-    "version": "0.2.0",
-    "publisher": "kip-dili",
+    "version": "1.0.0",
+    "publisher": "algorynth",
     "icon": "images/icon.png",
     "repository": {
         "type": "git",

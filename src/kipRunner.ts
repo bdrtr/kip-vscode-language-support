@@ -45,7 +45,7 @@ export class KipRunner {
         }
     }
 
-    private async findKipExecutable(): Promise<string | null> {
+    async findKipExecutable(): Promise<string | null> {
         // 1. Önce konfigürasyona bak (gelecek özellik)
         // const configPath = vscode.workspace.getConfiguration('kip').get<string>('compilerPath');
         // if (configPath && fs.existsSync(configPath)) return configPath;
