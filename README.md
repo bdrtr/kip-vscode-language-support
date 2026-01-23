@@ -1,20 +1,13 @@
 # Kip - Turkish Programming Language Extension
 
-[![Build Extension](https://github.com/bdrtr/kip-vscode-language-support/actions/workflows/build-extension.yml/badge.svg)](https://github.com/bdrtr/kip-vscode-language-support/actions/workflows/build-extension.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/bdrtr/kip-vscode-language-support/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/kip-dili/kip/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/algorynth.kip-language?label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)
 
 Türkçe tabanlı programlama dili **Kip** için profesyonel Visual Studio Code eklentisi.
 
-> **Not:** Bu topluluk tarafından geliştirilmiş bir eklentidir. Resmi Kip dil eklentisi değildir.
-
 ## 📥 Kurulum
 
-### 🌐 VS Code Marketplace (Önerilen)
-
-Eklenti artık **[VS Code Marketplace'te yayında](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)**!
-
+### VS Code Marketplace
 ```bash
 code --install-extension algorynth.kip-language
 ```
@@ -22,58 +15,26 @@ code --install-extension algorynth.kip-language
 Veya VS Code içinden:
 1. Extensions panelini açın (`Ctrl+Shift+X`)
 2. "Kip" araması yapın
-3. "Kip - Turkish Programming Language" eklentisini bulun
-4. **Install** butonuna tıklayın
-
-### 📦 VSIX Dosyası ile (GitHub)
-En son sürümü GitHub Actions'tan indirebilirsiniz:
-
-**[Son VSIX İndir](https://github.com/bdrtr/kip-vscode-language-support/actions/workflows/build-extension.yml)** → En son başarılı build → Artifacts → `kip-language-vsix`
-
-Sonra yükleyin:
-```bash
-code --install-extension kip-language-*.vsix
-```
+3. "Kip - Turkish Programming Language" eklentisini yükleyin
 
 ## ✨ Özellikler
 
-### 🔴 **Real-time Hata Tespiti**
-- Sözdizimi hataları anlık gösterilir
-- Tip hataları vurgulanır
-- Problems panel entegrasyonu
-- Türkçe hata mesajları
+### Temel Özellikler
+- ✅ **Syntax Highlighting** - Türkçe anahtar kelimeler ve syntax vurgulama
+- ✅ **Code Completion** - Akıllı kod tamamlama ve öneriler
+- ✅ **Hover Documentation** - Yerleşik fonksiyonlar için dokümantasyon
+- ✅ **Code Formatting** - Otomatik kod formatlama (`Shift+Alt+F`)
+- ✅ **Run Command** - Kip dosyalarını çalıştırma (`Ctrl+Shift+R`)
+- ✅ **Error Diagnostics** - Gerçek zamanlı hata tespiti
 
-### 🎯 **Kolay Navigasyon**
-- **F12** - Tanıma git (Go to Definition)
-- **Alt+F12** - Tanımı önizle (Peek Definition)
-- **Shift+F12** - Tüm referansları bul
-- **Ctrl+Shift+O** - Sembol arama
-
-### 🎨 **Otomatik Formatlama**
-- **Shift+Alt+F** - Dosyayı formatla
-- Format on Save desteği
-- 2 boşluk girintileme
-- Tutarlı kod stili
-
-### 📋 **Outline & Breadcrumbs**
-- Explorer'da Outline paneli
-- Editör üstünde breadcrumb navigasyon
-- Hiyerarşik sembol ağacı
-- Tip varyantları gösterimi
-
-### 💡 **Akıllı Kod Tamamlama**
-- Fonksiyon önerileri
-- Yerleşik tip önerileri
-- Türkçe hal eki desteği
-- Parametre ipuçları
-
-### 🌈 **Syntax Highlighting**
-- İşlevler, tipler, değişkenler
-- Yorumlar ve stringler
-- Türkçe anahtar kelimeler
-- Hal ekleri vurgulama
-
----
+### LSP Özellikleri (Language Server Protocol)
+- ✅ **Go to Definition** (`F12`) - Tanıma git
+- ✅ **Find References** (`Shift+F12`) - Tüm referansları bul
+- ✅ **Rename Symbol** (`F2`) - Sembol yeniden adlandırma
+- ✅ **Code Actions** (`Ctrl+.`) - Hızlı düzeltmeler
+- ✅ **Code Lens** - Referans sayısı gösterimi
+- ✅ **Outline** (`Ctrl+Shift+O`) - Sembol listesi
+- ✅ **Workspace Symbols** (`Ctrl+T`) - Workspace genelinde arama
 
 ## 🚀 Kullanım
 
@@ -87,14 +48,13 @@ code --install-extension kip-language-*.vsix
 Shift+Alt+F → Tüm dosyayı formatla
 ```
 
-### Sembol Arama
+### Navigasyon
 ```
-Ctrl+Shift+O → Sembol listesi
 F12 → Tanıma git
 Shift+F12 → Referansları bul
+Ctrl+Shift+O → Sembol listesi
+Ctrl+T → Workspace sembol araması
 ```
-
----
 
 ## 📚 Kod Örnekleri
 
@@ -120,46 +80,35 @@ ya pazar
 olabilir.
 ```
 
-### Recursive Fonksiyon
-```kip
-(bu tam-sayının) faktöriyeli,
-  (bunun 0'ın eşitliği) doğruysa,
-    1,
-  değilse,
-    (bunla (bunla 1'in farkının faktöriyeli)'nin çarpımıdır).
-```
-
----
-
-## 🎯 Tam Özellik Listesi
-
-| Özellik | Kısayol | Açıklama |
-|---------|---------|----------|
-| **Hata Tespiti** | Otomatik | Sözdizimi ve tip hataları |
-| **Tanıma Git** | `F12` | Sembol tanımına atla |
-| **Referans Bul** | `Shift+F12` | Tüm kullanımları göster |
-| **Formatlama** | `Shift+Alt+F` | Kodu düzenle |
-| **Sembol Arama** | `Ctrl+Shift+O` | Hızlı navigasyon |
-| **Dosya Çalıştır** | `Ctrl+Shift+R` | Kip programını çalıştır |
-| **Hover Bilgi** | Fare | Fonksiyon açıklamaları |
-| **Otomatik Tamamlama** | Yazarken | Akıllı öneriler |
-| **Outline View** | Explorer | Sembol ağacı |
-| **Breadcrumbs** | Editör üstü | Konum gösterimi |
-
----
-
 ## 🛠 Geliştirme
 
-### Gereksinimlere
+### Gereksinimler
 - Node.js 20+
-- npm veya yarn
-- VSCode 1.108+
+- npm
+- VS Code 1.80+
 
 ### Kurulum
 ```bash
-cd kip-vscode-extension
 npm install
 npm run compile
+```
+
+### Test ve Kontrol
+```bash
+# Bağımlılıkları kontrol et
+npm run check
+
+# Extension'ı test et
+npm run test
+
+# VSIX oluştur
+npm run package
+
+# VSIX'i validate et
+npm run validate kip-language-*.vsix
+
+# Tüm kontrolleri yap
+npm run quick-check
 ```
 
 ### Debug
@@ -167,13 +116,46 @@ npm run compile
 2. Yeni pencerede `.kip` dosyası açın
 3. Özellikleri test edin
 
-### VSIX Build
-```bash
-npm install -g @vscode/vsce
-vsce package
+## 📝 Yapılandırma
+
+Extension ayarları (`settings.json`):
+```json
+{
+  "kip.compilerPath": "",           // Kip derleyicisinin yolu
+  "kip.lspPath": "",                // Kip LSP sunucusunun yolu
+  "kip.enableCodeLens": true,       // Code Lens'i etkinleştir
+  "kip.formatOnSave": false,        // Kaydetme sırasında formatla
+  "kip.enableWorkspaceSymbols": true // Workspace sembol araması
+}
 ```
 
----
+## 🐛 Sorun Giderme
+
+### Hızlı Kontrol
+Tüm kontrolleri tek seferde yapmak için:
+```bash
+npm run quick-check
+```
+
+### Yaygın Sorunlar
+
+**LSP modülü yüklenemiyor:**
+```bash
+npm install
+npm run check
+npm run package
+```
+
+**VSIX'te modüller eksik:**
+- `.vscodeignore` dosyasını kontrol edin
+- Gerekli modüller için `!node_modules/modul-adi/**` ekleyin
+
+**Extension çalışmıyor:**
+1. VS Code'u yeniden başlatın
+2. Developer Console'u kontrol edin (`Ctrl+Shift+I`)
+3. Extension Host'u yeniden başlatın (`Ctrl+Shift+P` → "Developer: Restart Extension Host")
+
+Detaylı sorun giderme için `scripts/` klasöründeki scriptleri kullanın.
 
 ## 🤝 Katkıda Bulunma
 
@@ -183,21 +165,15 @@ vsce package
 4. Push edin (`git push origin feature/amazing`)
 5. Pull Request açın
 
----
-
 ## 📝 Lisans
 
 MIT License - detaylar için [LICENSE](LICENSE) dosyasına bakın.
 
----
-
 ## 🔗 Bağlantılar
 
 - **VS Code Marketplace:** [algorynth.kip-language](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)
-- **Extension Repo:** [github.com/bdrtr/kip-vscode-language-support](https://github.com/bdrtr/kip-vscode-language-support)
 - **Kip Dili Repo:** [github.com/kip-dili/kip](https://github.com/kip-dili/kip)
-- **Dokümantasyon:** [Kip Dili Rehberi](https://github.com/kip-dili/kip#readme)
-- **Issues:** [GitHub Issues](https://github.com/bdrtr/kip-vscode-language-support/issues)
+- **Issues:** [GitHub Issues](https://github.com/kip-dili/kip/issues)
 
 ---
 

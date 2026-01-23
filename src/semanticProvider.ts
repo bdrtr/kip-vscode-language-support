@@ -45,7 +45,19 @@ export class SemanticProvider {
                 }
             }
         } catch (error) {
-            console.error('Error getting semantic tokens:', error);
+            // LSP sunucusu semantic tokens'ı desteklemiyor - bu normal, sessizce devam et
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            if (errorMsg.includes('no handler') || errorMsg.includes('not supported')) {
+                // LSP sunucusu semantic tokens'ı desteklemiyor - bu beklenen bir durum
+                // Sadece ilk seferde log et, sonra sessizce devam et
+                if (!this.semanticCache.has('_semanticTokensNotSupported')) {
+                    console.log('ℹ️ LSP server does not support semantic tokens, using fallback');
+                    this.semanticCache.set('_semanticTokensNotSupported', null as any);
+                }
+            } else {
+                // Beklenmeyen bir hata - log et
+                console.error('Error getting semantic tokens:', error);
+            }
         }
 
         return null;

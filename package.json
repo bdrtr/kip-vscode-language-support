@@ -2,7 +2,7 @@
     "name": "kip-language",
     "displayName": "Kip - Turkish Programming Language",
     "description": "Kip programlama dili için VS Code desteği - Türkçe dilbilgisi tabanlı programlama",
-    "version": "1.0.9",
+    "version": "1.1.0",
     "publisher": "algorynth",
     "icon": "images/icon.png",
     "repository": {
@@ -15,7 +15,7 @@
     "homepage": "https://github.com/kip-dili/kip#readme",
     "license": "MIT",
     "engines": {
-        "vscode": "^1.70.0"
+        "vscode": "^1.80.0"
     },
     "categories": [
         "Programming Languages"
@@ -28,7 +28,6 @@
         "functional"
     ],
     "activationEvents": [
-        "onLanguage:kip",
         "onStartupFinished"
     ],
     "contributes": {
@@ -151,15 +150,22 @@
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
-        "lint": "eslint src --ext ts"
+        "lint": "eslint src --ext ts",
+        "check": "node scripts/check-dependencies.js",
+        "test": "node scripts/test-extension.js",
+        "validate": "node scripts/validate-vsix.js",
+        "quick-check": "bash scripts/quick-check.sh",
+        "package": "npm run compile && vsce package"
     },
     "author": "",
     "dependencies": {
+        "balanced-match": "^3.0.1",
+        "semver": "^7.7.3",
         "vscode-languageclient": "^9.0.1"
     },
     "devDependencies": {
         "@types/node": "^20.19.30",
-        "@types/vscode": "^1.70.0",
+        "@types/vscode": "^1.80.0",
         "@vscode/vsce": "^2.20.0",
         "typescript": "^5.0.0"
     }
