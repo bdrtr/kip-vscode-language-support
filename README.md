@@ -21,27 +21,19 @@ Veya VS Code içinden:
 
 ### GitHub Releases'dan VSIX İndirme (Önerilen)
 
-Her release için otomatik olarak VSIX dosyası oluşturulur ve Releases bölümünde yayınlanır:
+Main branch'e her push'ta kod otomatik derlenir ve VSIX dosyası release'de yayınlanır:
 
-1. **[GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases)** sayfasına gidin
-2. En son release'i seçin
-3. **Assets** bölümünden `kip-language-*.vsix` dosyasını indirin
-4. VS Code'da yükleyin:
+1. **[GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases/latest)** sayfasına gidin
+2. **Assets** bölümünden `kip-language-X.X.X.vsix` dosyasını indirin
+3. VS Code'da yükleyin:
    ```bash
-   code --install-extension kip-language-*.vsix
+   code --install-extension kip-language-X.X.X.vsix
    ```
 
-**Not:** Release oluşturulduğunda VSIX otomatik olarak release'e eklenir ve süresiz saklanır.
-
-### GitHub Actions Artifacts (Geliştirme)
-
-Geliştirme sırasında her commit için VSIX dosyası Artifacts olarak saklanır:
-
-1. **[GitHub Actions](https://github.com/algorynth/kip-vscode-language-support/actions)** sayfasına gidin
-2. En son başarılı workflow'u seçin
-3. **Artifacts** sekmesinden VSIX'i indirin
-
-**Not:** Artifacts 90 gün boyunca saklanır. Production kullanımı için Releases bölümünü kullanın.
+Veya VS Code içinden:
+1. `Ctrl+Shift+P` tuşlarına basın
+2. "Extensions: Install from VSIX..." yazın
+3. İndirdiğiniz VSIX dosyasını seçin
 
 ## ✨ Özellikler
 
@@ -144,31 +136,24 @@ npm run quick-check
 
 ### Release Oluşturma
 
-Yeni bir release oluşturmak için:
+Main branch'e push yapıldığında GitHub Actions otomatik olarak:
+1. Kodu derler
+2. VSIX dosyası oluşturur
+3. Release oluşturur ve VSIX'i ekler
 
-1. **Versiyon numarasını artırın** (`package.json` içinde):
-   ```json
-   "version": "1.2.0"
-   ```
+**Yeni versiyon yayınlamak için:**
 
-2. **Tag oluşturun ve push edin:**
-   ```bash
-   git tag v1.2.0
-   git push origin v1.2.0
-   ```
-
-3. **GitHub Actions otomatik olarak:**
-   - Extension'ı derler
-   - VSIX dosyası oluşturur
-   - Yeni release oluşturur
-   - VSIX dosyasını release'e ekler
-
-**Alternatif:** Otomatik script kullanarak:
 ```bash
-npm run release:patch  # 1.1.0 -> 1.1.1
-npm run release:minor  # 1.1.0 -> 1.2.0
-npm run release:major  # 1.1.0 -> 2.0.0
+# Otomatik script ile (önerilen)
+npm run release:patch  # 1.1.0 -> 1.1.1 (bug fix)
+npm run release:minor  # 1.1.0 -> 1.2.0 (yeni özellik)
+npm run release:major  # 1.1.0 -> 2.0.0 (büyük değişiklik)
 ```
+
+**Manuel yöntem:**
+1. `package.json`'da versiyonu değiştirin
+2. Commit ve push edin
+3. GitHub Actions otomatik release oluşturur
 
 ## 📝 Yapılandırma
 
