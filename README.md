@@ -142,6 +142,34 @@ npm run quick-check
 2. Yeni pencerede `.kip` dosyası açın
 3. Özellikleri test edin
 
+### Release Oluşturma
+
+Yeni bir release oluşturmak için:
+
+1. **Versiyon numarasını artırın** (`package.json` içinde):
+   ```json
+   "version": "1.2.0"
+   ```
+
+2. **Tag oluşturun ve push edin:**
+   ```bash
+   git tag v1.2.0
+   git push origin v1.2.0
+   ```
+
+3. **GitHub Actions otomatik olarak:**
+   - Extension'ı derler
+   - VSIX dosyası oluşturur
+   - Yeni release oluşturur
+   - VSIX dosyasını release'e ekler
+
+**Alternatif:** Otomatik script kullanarak:
+```bash
+npm run release:patch  # 1.1.0 -> 1.1.1
+npm run release:minor  # 1.1.0 -> 1.2.0
+npm run release:major  # 1.1.0 -> 2.0.0
+```
+
 ## 📝 Yapılandırma
 
 Extension ayarları (`settings.json`):

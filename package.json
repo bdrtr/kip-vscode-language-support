@@ -155,7 +155,10 @@
         "test": "node scripts/test-extension.js",
         "validate": "node scripts/validate-vsix.js",
         "quick-check": "bash scripts/quick-check.sh",
-        "package": "npm run compile && vsce package"
+        "package": "npm run compile && vsce package",
+        "release:patch": "node scripts/release.js patch",
+        "release:minor": "node scripts/release.js minor",
+        "release:major": "node scripts/release.js major"
     },
     "author": "",
     "dependencies": {

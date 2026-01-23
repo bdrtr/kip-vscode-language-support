@@ -3,6 +3,8 @@ name: Build Extension
 on:
   push:
     branches: [ main, master ]
+    tags:
+      - 'v*'  # v1.0.0, v1.1.0 gibi tag'ler için otomatik release
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -42,12 +44,25 @@ jobs:
     - name: Validate VSIX
       run: npm run validate kip-language-*.vsix
       
-    - name: Get version from package.json
+    - name: Get version from package.json or tag
       id: version
       run: |
-        VERSION=$(node -p "require('./package.json').version")
+        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          # Tag'den versiyon al (v1.1.0 -> 1.1.0)
+          VERSION="${GITHUB_REF#refs/tags/v}"
+        else
+          # package.json'dan versiyon al
+          VERSION=$(node -p "require('./package.json').version")
+        fi
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "VSIX version: $VERSION"
+      
+    - name: Rename VSIX with version
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        mv kip-language-*.vsix "kip-language-${VERSION}.vsix"
+        echo "VSIX renamed to: kip-language-${VERSION}.vsix"
       
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
@@ -61,13 +76,15 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: '*.vsix'
+        tag_name: ${{ github.ref_name }}
+        name: Kip Language Extension ${{ steps.version.outputs.version }}
         generate_release_notes: true
         draft: false
         prerelease: false
         body: |
-          ## 📦 VSIX Dosyası
+          ## 📦 Kip Language Extension v${{ steps.version.outputs.version }}
           
-          Bu release için VSIX dosyası otomatik olarak oluşturulmuştur.
+          Bu release için VSIX dosyası otomatik olarak derlenmiş ve yayınlanmıştır.
           
           ### 📥 Kurulum
           
@@ -77,9 +94,10 @@ jobs:
           ```
           
           **VSIX Dosyası ile:**
-          ```bash
-          code --install-extension kip-language-*.vsix
-          ```
+          1. Aşağıdaki `kip-language-${{ steps.version.outputs.version }}.vsix` dosyasını indirin
+          2. VS Code'da `Ctrl+Shift+P` (veya `Cmd+Shift+P` macOS'ta) tuşlarına basın
+          3. "Extensions: Install from VSIX..." komutunu çalıştırın
+          4. İndirdiğiniz VSIX dosyasını seçin
           
           ### ✨ Bu Versiyondaki Değişiklikler
           
