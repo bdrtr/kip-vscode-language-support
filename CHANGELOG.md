@@ -2,6 +2,48 @@
 
 Kip Language Support eklentisinin tüm önemli değişiklikleri bu dosyada belgelenecektir.
 
+## [1.0.9] - 2026-01-23
+
+### Eklenenler
+- 🎯 **Semantic-Based Architecture**: Tüm provider'lar artık LSP semantic bilgilerini kullanıyor
+  - Hard-coded pattern'ler kaldırıldı
+  - LSP semantic tokens desteği
+  - AST-based symbol resolution
+  - Fallback mekanizmaları
+- 🔄 **Rename Provider (F2)**: Sembolleri yeniden adlandırma
+  - Türkçe hal eklerini korur
+  - Tüm referansları otomatik günceller
+- ⚡ **Code Actions Provider**: Hızlı düzeltmeler ve refactoring
+  - Eksik tanımlar için öneriler
+  - Fonksiyon çıkarma (Extract Function)
+  - Yorum satırına alma
+- 🔍 **Workspace Symbols Provider (Ctrl+T)**: Tüm workspace'te sembol arama
+  - Multi-file symbol search
+  - Cache mekanizması
+- 👁️ **Code Lens Provider**: Referans sayısı gösterimi
+  - Fonksiyon ve tip tanımlarında referans sayısı
+  - Tıklanabilir referans görüntüleme
+- ⚙️ **Configuration Settings**: Kullanıcı ayarları
+  - `kip.compilerPath` - Derleyici yolu
+  - `kip.lspPath` - LSP sunucu yolu
+  - `kip.enableCodeLens` - Code Lens aç/kapat
+  - `kip.formatOnSave` - Kaydetmede otomatik formatla
+  - `kip.enableWorkspaceSymbols` - Workspace sembol araması
+
+### Değişiklikler
+- Tüm provider'lar LSP semantic bilgilerini kullanacak şekilde yeniden yazıldı
+- Definition Provider: LSP semantic kullanıyor
+- Reference Provider: LSP semantic kullanıyor
+- Symbol Provider: LSP semantic kullanıyor
+- Type safety iyileştirildi
+- Error handling geliştirildi
+
+### Kaldırılanlar
+- Deprecated `diagnosticProvider.ts` kaldırıldı (LSP tarafından sağlanıyor)
+- Gereksiz test dosyaları temizlendi
+- Test bağımlılıkları kaldırıldı
+- Gereksiz örnek dosyalar kaldırıldı
+
 ## [0.2.0] - 2026-01-21
 
 ### Eklenenler
