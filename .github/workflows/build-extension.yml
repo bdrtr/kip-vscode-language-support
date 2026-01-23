@@ -4,20 +4,22 @@ on:
   push:
     branches: [ main, master ]
     tags:
-      - 'v*'  # v1.0.0, v1.1.0 gibi tag'ler için otomatik release
+      - 'v*'
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
-  release:
-    types: [created]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
       
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -37,47 +39,52 @@ jobs:
     - name: Install vsce
       run: npm install -g @vscode/vsce
       
-    - name: Package extension
-      run: vsce package --out kip-language-${{ github.ref_name }}-${{ github.sha }}.vsix
-      id: package
-      
-    - name: Validate VSIX
-      run: npm run validate kip-language-*.vsix
-      
-    - name: Get version from package.json or tag
+    - name: Get version from package.json
       id: version
       run: |
-        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-          # Tag'den versiyon al (v1.1.0 -> 1.1.0)
-          VERSION="${GITHUB_REF#refs/tags/v}"
-        else
-          # package.json'dan versiyon al
-          VERSION=$(node -p "require('./package.json').version")
-        fi
+        VERSION=$(node -p "require('./package.json').version")
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "VSIX version: $VERSION"
       
-    - name: Rename VSIX with version
-      if: startsWith(github.ref, 'refs/tags/v')
+    - name: Package extension
       run: |
-        VERSION="${{ steps.version.outputs.version }}"
-        mv kip-language-*.vsix "kip-language-${VERSION}.vsix"
-        echo "VSIX renamed to: kip-language-${VERSION}.vsix"
+        vsce package --out "kip-language-${{ steps.version.outputs.version }}.vsix"
+        echo "VSIX created: kip-language-${{ steps.version.outputs.version }}.vsix"
+      
+    - name: Validate VSIX
+      run: npm run validate "kip-language-${{ steps.version.outputs.version }}.vsix"
       
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
       with:
-        name: kip-language-vsix-${{ steps.version.outputs.version }}
+        name: kip-language-${{ steps.version.outputs.version }}
         path: '*.vsix'
         retention-days: 90
+    
+    # Tag push veya main branch push'ta release oluştur
+    - name: Check if release exists
+      id: check_release
+      if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        # Release var mı kontrol et
+        if gh release view "v${VERSION}" &>/dev/null; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "Release v${VERSION} already exists"
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "Release v${VERSION} does not exist"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: Create Release (on tag)
-      if: startsWith(github.ref, 'refs/tags/v')
+    - name: Create Release
+      if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && steps.check_release.outputs.exists == 'false'
       uses: softprops/action-gh-release@v1
       with:
         files: '*.vsix'
-        tag_name: ${{ github.ref_name }}
-        name: Kip Language Extension ${{ steps.version.outputs.version }}
+        tag_name: v${{ steps.version.outputs.version }}
+        name: Kip Language Extension v${{ steps.version.outputs.version }}
         generate_release_notes: true
         draft: false
         prerelease: false
@@ -102,11 +109,16 @@ jobs:
           ### ✨ Bu Versiyondaki Değişiklikler
           
           Detaylar için [CHANGELOG.md](CHANGELOG.md) dosyasına bakın.
-          
-          ### 🔗 Bağlantılar
-          
-          - [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)
-          - [GitHub Repository](https://github.com/algorynth/kip-vscode-language-support)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    # Mevcut release varsa VSIX'i güncelle
+    - name: Update existing release
+      if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && steps.check_release.outputs.exists == 'true'
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        echo "Updating release v${VERSION} with new VSIX..."
+        gh release upload "v${VERSION}" "kip-language-${VERSION}.vsix" --clobber
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
