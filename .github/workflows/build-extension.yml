@@ -62,18 +62,33 @@ jobs:
       with:
         files: '*.vsix'
         generate_release_notes: true
+        draft: false
+        prerelease: false
         body: |
           ## 📦 VSIX Dosyası
           
           Bu release için VSIX dosyası otomatik olarak oluşturulmuştur.
           
-          ### Kurulum
+          ### 📥 Kurulum
+          
+          **VS Code Marketplace:**
+          ```bash
+          code --install-extension algorynth.kip-language
+          ```
+          
+          **VSIX Dosyası ile:**
           ```bash
           code --install-extension kip-language-*.vsix
           ```
           
-          ### Değişiklikler
+          ### ✨ Bu Versiyondaki Değişiklikler
+          
           Detaylar için [CHANGELOG.md](CHANGELOG.md) dosyasına bakın.
+          
+          ### 🔗 Bağlantılar
+          
+          - [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)
+          - [GitHub Repository](https://github.com/algorynth/kip-vscode-language-support)
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         

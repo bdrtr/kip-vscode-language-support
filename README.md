@@ -1,8 +1,9 @@
 # Kip - Turkish Programming Language Extension
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/kip-dili/kip/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/algorynth/kip-vscode-language-support/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Build Extension](https://github.com/algorynth/kip-vscode-language-support/actions/workflows/build-extension.yml/badge.svg)](https://github.com/algorynth/kip-vscode-language-support/actions/workflows/build-extension.yml)
+[![Latest Release](https://img.shields.io/github/v/release/algorynth/kip-vscode-language-support)](https://github.com/algorynth/kip-vscode-language-support/releases/latest)
 
 Türkçe tabanlı programlama dili **Kip** için profesyonel Visual Studio Code eklentisi.
 
@@ -18,19 +19,29 @@ Veya VS Code içinden:
 2. "Kip" araması yapın
 3. "Kip - Turkish Programming Language" eklentisini yükleyin
 
-### GitHub Actions'dan VSIX İndirme
+### GitHub Releases'dan VSIX İndirme (Önerilen)
 
-Her commit ve release için otomatik olarak VSIX dosyası oluşturulur:
+Her release için otomatik olarak VSIX dosyası oluşturulur ve Releases bölümünde yayınlanır:
 
-1. **[GitHub Actions](https://github.com/algorynth/kip-vscode-language-support/actions)** sayfasına gidin
-2. En son başarılı workflow'u seçin
-3. **Artifacts** sekmesinden `kip-language-vsix-*.vsix` dosyasını indirin
+1. **[GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases)** sayfasına gidin
+2. En son release'i seçin
+3. **Assets** bölümünden `kip-language-*.vsix` dosyasını indirin
 4. VS Code'da yükleyin:
    ```bash
    code --install-extension kip-language-*.vsix
    ```
 
-**Not:** GitHub Actions her push'ta otomatik olarak VSIX oluşturur ve 90 gün boyunca saklar.
+**Not:** Release oluşturulduğunda VSIX otomatik olarak release'e eklenir ve süresiz saklanır.
+
+### GitHub Actions Artifacts (Geliştirme)
+
+Geliştirme sırasında her commit için VSIX dosyası Artifacts olarak saklanır:
+
+1. **[GitHub Actions](https://github.com/algorynth/kip-vscode-language-support/actions)** sayfasına gidin
+2. En son başarılı workflow'u seçin
+3. **Artifacts** sekmesinden VSIX'i indirin
+
+**Not:** Artifacts 90 gün boyunca saklanır. Production kullanımı için Releases bölümünü kullanın.
 
 ## ✨ Özellikler
 
