@@ -33,11 +33,11 @@ export class KipRunner {
         const kipPath = await this.findKipExecutable();
 
         if (kipPath) {
-            // Tam yol ile çalıştır ki garanti olsun (ve EOF gönder)
-            terminal.sendText(`echo "" | "${kipPath}" "${filePath}"`);
+            // Use --exec to run and exit cleanly
+            terminal.sendText(`"${kipPath}" --exec "${filePath}"`);
         } else {
-            // Fallback: Belki PATH'tedir, direkt dene (ve EOF gönder)
-            terminal.sendText(`echo "" | kip "${filePath}"`);
+            // Fallback: Try 'kip' in PATH
+            terminal.sendText(`kip --exec "${filePath}"`);
 
             // Eğer hata verirse (komut yoksa), kullanıcı anlar.
             // Ama daha şık olması için kontrol ekleyebiliriz.

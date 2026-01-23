@@ -2,7 +2,7 @@
     "name": "kip-language",
     "displayName": "Kip - Turkish Programming Language",
     "description": "Kip programlama dili için VS Code desteği - Türkçe dilbilgisi tabanlı programlama",
-    "version": "1.0.0",
+    "version": "1.0.9",
     "publisher": "algorynth",
     "icon": "images/icon.png",
     "repository": {
@@ -28,7 +28,8 @@
         "functional"
     ],
     "activationEvents": [
-        "onLanguage:kip"
+        "onLanguage:kip",
+        "onStartupFinished"
     ],
     "contributes": {
         "languages": [
@@ -67,8 +68,53 @@
                 "title": "Run Kip File",
                 "category": "Kip",
                 "icon": "$(play)"
+            },
+            {
+                "command": "kip.showReferences",
+                "title": "Show References",
+                "category": "Kip"
+            },
+            {
+                "command": "kip.extractFunction",
+                "title": "Extract Function",
+                "category": "Kip"
             }
         ],
+        "configuration": {
+            "title": "Kip",
+            "properties": {
+                "kip.compilerPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Kip derleyicisinin tam yolu (boş bırakılırsa PATH'ten aranır)",
+                    "scope": "machine"
+                },
+                "kip.lspPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Kip LSP sunucusunun tam yolu (boş bırakılırsa otomatik bulunur)",
+                    "scope": "machine"
+                },
+                "kip.enableCodeLens": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Referans sayısını gösteren Code Lens'i etkinleştir",
+                    "scope": "resource"
+                },
+                "kip.formatOnSave": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Kaydetme sırasında otomatik formatla",
+                    "scope": "resource"
+                },
+                "kip.enableWorkspaceSymbols": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Workspace sembol aramasını etkinleştir (Ctrl+T)",
+                    "scope": "resource"
+                }
+            }
+        },
         "menus": {
             "editor/title/run": [
                 {
@@ -92,6 +138,12 @@
                 "mac": "cmd+shift+r",
                 "when": "resourceLangId == kip"
             }
+        ],
+        "fileAssociations": [
+            {
+                "pattern": "**/*.kip",
+                "icon": "images/icon.png"
+            }
         ]
     },
     "main": "./out/extension.js",
@@ -99,16 +151,16 @@
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
-        "pretest": "npm run compile",
-        "lint": "eslint src --ext ts",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "lint": "eslint src --ext ts"
     },
     "author": "",
-    "devDependencies": {
-        "@types/node": "^20.0.0",
-        "@types/vscode": "^1.70.0",
-        "typescript": "^5.0.0",
-        "@vscode/vsce": "^2.20.0"
+    "dependencies": {
+        "vscode-languageclient": "^9.0.1"
     },
-    "dependencies": {}
+    "devDependencies": {
+        "@types/node": "^20.19.30",
+        "@types/vscode": "^1.70.0",
+        "@vscode/vsce": "^2.20.0",
+        "typescript": "^5.0.0"
+    }
 }

@@ -13,16 +13,22 @@
             "include": "#numbers"
         },
         {
-            "include": "#keywords"
+            "include": "#type-definitions"
         },
         {
-            "include": "#types"
+            "include": "#data-constructors"
+        },
+        {
+            "include": "#function-signatures"
+        },
+        {
+            "include": "#keywords"
         },
         {
             "include": "#constants"
         },
         {
-            "include": "#builtin-functions"
+            "include": "#identifiers"
         },
         {
             "include": "#case-suffixes"
@@ -70,11 +76,11 @@
             "patterns": [
                 {
                     "name": "keyword.control.kip",
-                    "match": "\\b(ya da)\\b"
+                    "match": "\\b(ya da|ya|olabilir|diyelim|olsun|Bir|var|yerleşik|olarak|ve|ile|ise|yoksa|için|kadar|diye|gibi)\\b"
                 },
                 {
-                    "name": "keyword.control.kip",
-                    "match": "\\b(ya|olabilir|diyelim|olsun|Bir|var|yerleşik|olarak)\\b"
+                    "name": "keyword.control.verb.kip",
+                    "match": "\\b(yazıp|yazmaktır|çalıştırmak|çalıştır|oku|okuyup|bitir|başla|dön|döndür)\\b"
                 },
                 {
                     "name": "keyword.control.conditional.kip",
@@ -82,15 +88,11 @@
                 }
             ]
         },
-        "types": {
+        "identifiers": {
             "patterns": [
                 {
-                    "name": "entity.name.type.kip",
-                    "match": "\\b(tam-sayı|dizge|doğruluk|listesi|olasılığı|boşluk|bitim|doğal-sayı)\\b"
-                },
-                {
-                    "name": "entity.name.type.generic.kip",
-                    "match": "\\b(öğe|öğenin)\\b"
+                    "name": "variable.other.kip",
+                    "match": "\\b[a-züöşğçıA-ZÜÖŞĞÇİ][a-züöşğçıA-ZÜÖŞĞÇİ\\-]*\\b"
                 }
             ]
         },
@@ -99,62 +101,14 @@
                 {
                     "name": "constant.language.boolean.kip",
                     "match": "\\b(doğru|yanlış)\\b"
-                },
-                {
-                    "name": "constant.language.kip",
-                    "match": "\\b(sıfır|boş|yokluğu|varlığı|durmak|durmaktır|bitimlik|bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on)\\b"
-                }
-            ]
-        },
-        "builtin-functions": {
-            "patterns": [
-                {
-                    "name": "entity.name.function.builtin.io.kip",
-                    "match": "\\b(yazmak|yaz|okumak|oku|yazıp|okuyup)\\b"
-                },
-                {
-                    "name": "entity.name.function.builtin.arithmetic.kip",
-                    "match": "\\b(toplamı|toplamını|farkı|farkını|çarpımı|çarpımını|bölümü|bölümünü)\\b"
-                },
-                {
-                    "name": "entity.name.function.builtin.comparison.kip",
-                    "match": "\\b(eşitliği|eşitliğini|küçüklüğü|küçüklüğünü|büyüklüğü|büyüklüğünü)\\b"
-                },
-                {
-                    "name": "entity.name.function.builtin.string.kip",
-                    "match": "\\b(uzunluğu|uzunluğunu|birleşimi|birleşimini|tam-sayı-hali)\\b"
-                },
-                {
-                    "name": "entity.name.function.builtin.other.kip",
-                    "match": "\\b(öncülü|öncülün|ardılı|ardılın|sıfırlığı|faktöriyeli|tersi|kopyası|eki)\\b"
                 }
             ]
         },
         "case-suffixes": {
             "patterns": [
                 {
-                    "name": "keyword.operator.case.accusative.kip",
-                    "match": "'(y)?[ıiuü]\\b"
-                },
-                {
-                    "name": "keyword.operator.case.dative.kip",
-                    "match": "'(y)?[ae]\\b"
-                },
-                {
-                    "name": "keyword.operator.case.locative.kip",
-                    "match": "'(d)?[ae]\\b"
-                },
-                {
-                    "name": "keyword.operator.case.ablative.kip",
-                    "match": "'(d)?[ae]n\\b"
-                },
-                {
-                    "name": "keyword.operator.case.genitive.kip",
-                    "match": "'(n)?[ıiuü]n\\b"
-                },
-                {
-                    "name": "keyword.operator.case.instrumental.kip",
-                    "match": "'(y)?l[ae]\\b"
+                    "name": "keyword.operator.case.kip",
+                    "match": "[']([yYnNdD]?[aAeEıIiİuUüÜ])"
                 },
                 {
                     "name": "keyword.operator.sequencing.kip",

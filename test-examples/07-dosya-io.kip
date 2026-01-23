@@ -1,7 +1,0 @@
-çalıştırmak,
-  "./yazı.tmp"ye "selam kip" yazıp,
-  sonuç olarak "./yazı.tmp"'den okuyup,
-  sonuç yokluksa, durmaktır,
-  (metnin varlığıysa), metni yazmaktır.
-
-çalıştır.
