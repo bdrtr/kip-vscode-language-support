@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
+  release:
+    types: [created]
 
 jobs:
   build:
@@ -19,23 +21,38 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+        cache: 'npm'
         
     - name: Install dependencies
       run: npm ci
-      
+        
+    - name: Run dependency check
+      run: npm run check
+        
     - name: Compile TypeScript
       run: npm run compile
-      
+        
     - name: Install vsce
       run: npm install -g @vscode/vsce
       
     - name: Package extension
-      run: vsce package --out kip-language-${{ github.sha }}.vsix
+      run: vsce package --out kip-language-${{ github.ref_name }}-${{ github.sha }}.vsix
+      id: package
+      
+    - name: Validate VSIX
+      run: npm run validate kip-language-*.vsix
+      
+    - name: Get version from package.json
+      id: version
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "VSIX version: $VERSION"
       
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
       with:
-        name: kip-language-vsix
+        name: kip-language-vsix-${{ steps.version.outputs.version }}
         path: '*.vsix'
         retention-days: 90
         
@@ -45,5 +62,35 @@ jobs:
       with:
         files: '*.vsix'
         generate_release_notes: true
+        body: |
+          ## 📦 VSIX Dosyası
+          
+          Bu release için VSIX dosyası otomatik olarak oluşturulmuştur.
+          
+          ### Kurulum
+          ```bash
+          code --install-extension kip-language-*.vsix
+          ```
+          
+          ### Değişiklikler
+          Detaylar için [CHANGELOG.md](CHANGELOG.md) dosyasına bakın.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Comment PR with VSIX download
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const vsixFiles = fs.readdirSync('.').filter(f => f.endsWith('.vsix'));
+          if (vsixFiles.length > 0) {
+            const vsixFile = vsixFiles[0];
+            const fileSize = (fs.statSync(vsixFile).size / 1024 / 1024).toFixed(2);
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ✅ Extension Build Başarılı!\n\n📦 **VSIX Dosyası:** \`${vsixFile}\` (${fileSize} MB)\n\nArtifacts sekmesinden indirebilirsiniz.`
+            });
+          }

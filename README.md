@@ -2,6 +2,7 @@
 
 [![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/kip-dili/kip/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Build Extension](https://github.com/algorynth/kip-vscode-language-support/actions/workflows/build-extension.yml/badge.svg)](https://github.com/algorynth/kip-vscode-language-support/actions/workflows/build-extension.yml)
 
 Türkçe tabanlı programlama dili **Kip** için profesyonel Visual Studio Code eklentisi.
 
@@ -16,6 +17,20 @@ Veya VS Code içinden:
 1. Extensions panelini açın (`Ctrl+Shift+X`)
 2. "Kip" araması yapın
 3. "Kip - Turkish Programming Language" eklentisini yükleyin
+
+### GitHub Actions'dan VSIX İndirme
+
+Her commit ve release için otomatik olarak VSIX dosyası oluşturulur:
+
+1. **[GitHub Actions](https://github.com/algorynth/kip-vscode-language-support/actions)** sayfasına gidin
+2. En son başarılı workflow'u seçin
+3. **Artifacts** sekmesinden `kip-language-vsix-*.vsix` dosyasını indirin
+4. VS Code'da yükleyin:
+   ```bash
+   code --install-extension kip-language-*.vsix
+   ```
+
+**Not:** GitHub Actions her push'ta otomatik olarak VSIX oluşturur ve 90 gün boyunca saklar.
 
 ## ✨ Özellikler
 
