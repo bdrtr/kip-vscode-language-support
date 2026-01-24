@@ -2,22 +2,12 @@
 
 [![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/algorynth/kip-vscode-language-support/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Build Extension](https://github.com/algorynth/kip-vscode-language-support/actions/workflows/build-extension.yml/badge.svg)](https://github.com/algorynth/kip-vscode-language-support/actions/workflows/build-extension.yml)
-[![Latest Release](https://img.shields.io/github/v/release/algorynth/kip-vscode-language-support)](https://github.com/algorynth/kip-vscode-language-support/releases/latest)
 
-Türkçe tabanlı programlama dili **Kip** için profesyonel Visual Studio Code eklentisi.
+> ⚠️ **Not an official extension** - This is a community-maintained extension for the Kip programming language.
+
+Türkçe tabanlı programlama dili **Kip** için Visual Studio Code eklentisi.
 
 ## 📥 Kurulum
-
-### VS Code Marketplace
-```bash
-code --install-extension algorynth.kip-language
-```
-
-Veya VS Code içinden:
-1. Extensions panelini açın (`Ctrl+Shift+X`)
-2. "Kip" araması yapın
-3. "Kip - Turkish Programming Language" eklentisini yükleyin
 
 ### GitHub Releases'dan VSIX İndirme (Önerilen)
 
@@ -44,9 +34,8 @@ Veya VS Code içinden:
 - ✅ **Code Formatting** - Otomatik kod formatlama (`Shift+Alt+F`)
 - ✅ **Run Command** - Kip dosyalarını çalıştırma (`Ctrl+Shift+R`)
 - ✅ **Error Diagnostics** - Gerçek zamanlı hata tespiti
-- ✅ **Otomatik Binary İndirme** - Kip derleyicisi bulunamazsa GitHub Releases'dan otomatik indirir
-- ✅ **Platform Desteği** - Linux, macOS (Intel/ARM), Windows için binary'ler
-- ✅ **Binary Cache** - İndirilen binary'ler cache'lenir, sonraki kullanımlarda hızlı erişim
+- ✅ **Otomatik Kurulum** - Kip derleyicisi bulunamazsa otomatik kurulum script'i çalıştırır
+- ✅ **Cross-Platform** - Linux, macOS (Intel/ARM), Windows desteği
 
 ### LSP Özellikleri (Language Server Protocol)
 - ✅ **Go to Definition** (`F12`) - Tanıma git
@@ -59,15 +48,26 @@ Veya VS Code içinden:
 
 ## 🚀 Kullanım
 
+### Kip Derleyicisi Kurulumu
+
+**İlk Kullanım:**
+- Eğer sistemde `kip` derleyicisi yoksa, extension otomatik kurulum seçeneği sunar
+- "Kur" butonuna tıklayarak cross-platform kurulum script'i çalıştırılır
+- Script otomatik olarak:
+  1. Foma'yı kurar (finite-state morphology toolkit)
+  2. Stack'i kurar (Haskell build tool)
+  3. kip-lang repository'sini clone eder
+  4. Build eder ve `~/.local/bin/` dizinine kurar
+
+**Desteklenen İşletim Sistemleri:**
+- **Linux**: apt-get, dnf, yum, pacman desteği
+- **macOS**: Homebrew desteği
+- **Windows**: PowerShell script desteği (Chocolatey veya manuel)
+
 ### Kip Dosyası Çalıştırma
 1. `.kip` uzantılı dosya açın
 2. Sağ üstteki **▶ Run** butonuna basın
 3. Veya **Ctrl+Shift+R** kısayolu
-
-**İlk Kullanım:**
-- Eğer sistemde `kip` derleyicisi yoksa, extension otomatik olarak GitHub Releases'dan indirme seçeneği sunar
-- Binary indirildikten sonra cache'lenir ve sonraki kullanımlarda otomatik olarak kullanılır
-- Tüm platformlar için (Linux, macOS Intel/ARM, Windows) binary desteği mevcuttur
 
 ### Kod Formatlama
 ```
@@ -142,27 +142,6 @@ npm run quick-check
 2. Yeni pencerede `.kip` dosyası açın
 3. Özellikleri test edin
 
-### Release Oluşturma
-
-Main branch'e push yapıldığında GitHub Actions otomatik olarak:
-1. Kodu derler
-2. VSIX dosyası oluşturur
-3. Release oluşturur ve VSIX'i ekler
-
-**Yeni versiyon yayınlamak için:**
-
-```bash
-# Otomatik script ile (önerilen)
-npm run release:patch  # 1.1.0 -> 1.1.1 (bug fix)
-npm run release:minor  # 1.1.0 -> 1.2.0 (yeni özellik)
-npm run release:major  # 1.1.0 -> 2.0.0 (büyük değişiklik)
-```
-
-**Manuel yöntem:**
-1. `package.json`'da versiyonu değiştirin
-2. Commit ve push edin
-3. GitHub Actions otomatik release oluşturur
-
 ## 📝 Yapılandırma
 
 Extension ayarları (`settings.json`):
@@ -181,39 +160,24 @@ Extension ayarları (`settings.json`):
 Extension, `kip` derleyicisini şu sırayla arar:
 
 1. **`kip.compilerPath` ayarı** - VS Code ayarlarında belirtilen yol
-2. **Cache'deki binary** - Daha önce indirilen binary (extension global storage)
-3. **Varsayılan kurulum yolu** - `~/.local/bin/kip` (Linux/macOS)
-4. **Sistem PATH'i** - Sistem PATH'inde `kip` komutu
-5. **GitHub Releases'dan indirme** - Otomatik olarak GitHub'dan indirir (kullanıcı onayı ile)
-
-### Otomatik Binary İndirme
-
-Extension, `kip` derleyicisi bulunamazsa:
-- GitHub Releases'dan indirme seçeneği sunar
-- Önce `algorynth/kip-vscode-language-support` repo'sundan arar
-- Bulamazsa `kip-dili/kip` repo'sundan arar
-- İndirilen binary cache'lenir (`~/.config/Code/User/globalStorage/algorynth.kip-language/kip-binaries/`)
-- Sonraki kullanımlarda cache'den otomatik kullanılır
+2. **Varsayılan kurulum yolu** - `~/.local/bin/kip` (Linux/macOS) veya `%USERPROFILE%\.local\bin\kip.exe` (Windows)
+3. **Sistem PATH'i** - Sistem PATH'inde `kip` komutu
+4. **Otomatik kurulum** - Kullanıcı onayı ile cross-platform kurulum script'i çalıştırılır
 
 ## 🐛 Sorun Giderme
-
-### Hızlı Kontrol
-Tüm kontrolleri tek seferde yapmak için:
-```bash
-npm run quick-check
-```
 
 ### Yaygın Sorunlar
 
 **Kip derleyicisi bulunamıyor:**
-- Extension otomatik olarak GitHub Releases'dan indirme seçeneği sunar
+- Extension otomatik kurulum seçeneği sunar
 - Veya VS Code ayarlarından `kip.compilerPath` ayarını kullanarak manuel yol belirtebilirsiniz
 - Sistem PATH'ine `kip` binary'sini ekleyebilirsiniz
 
-**Binary indirme başarısız:**
+**Kurulum script'i başarısız:**
 - İnternet bağlantınızı kontrol edin
-- GitHub Releases'da binary'lerin mevcut olduğundan emin olun
-- Manuel olarak binary'leri indirip `kip.compilerPath` ayarına yol belirtebilirsiniz
+- Gerekli bağımlılıkların (git, curl/wget) kurulu olduğundan emin olun
+- Linux'ta: sudo yetkilerine sahip olduğunuzdan emin olun
+- Windows'ta: PowerShell execution policy'yi kontrol edin
 
 **LSP modülü yüklenemiyor:**
 ```bash
@@ -222,16 +186,10 @@ npm run check
 npm run package
 ```
 
-**VSIX'te modüller eksik:**
-- `.vscodeignore` dosyasını kontrol edin
-- Gerekli modüller için `!node_modules/modul-adi/**` ekleyin
-
 **Extension çalışmıyor:**
 1. VS Code'u yeniden başlatın
 2. Developer Console'u kontrol edin (`Ctrl+Shift+I`)
 3. Extension Host'u yeniden başlatın (`Ctrl+Shift+P` → "Developer: Restart Extension Host")
-
-Detaylı sorun giderme için `scripts/` klasöründeki scriptleri kullanın.
 
 ## 🤝 Katkıda Bulunma
 
@@ -247,9 +205,8 @@ MIT License - detaylar için [LICENSE](LICENSE) dosyasına bakın.
 
 ## 🔗 Bağlantılar
 
-- **VS Code Marketplace:** [algorynth.kip-language](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)
 - **Kip Dili Repo:** [github.com/kip-dili/kip](https://github.com/kip-dili/kip)
-- **Issues:** [GitHub Issues](https://github.com/kip-dili/kip/issues)
+- **Issues:** [GitHub Issues](https://github.com/algorynth/kip-vscode-language-support/issues)
 
 ---
 

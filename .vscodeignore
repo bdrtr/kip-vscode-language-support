@@ -20,10 +20,4 @@ node_modules/**
 !node_modules/vscode-languageserver-types/**
 !node_modules/semver/**
 !node_modules/balanced-match/**
-!node_modules/@octokit/**
-!node_modules/universal-user-agent/**
-!node_modules/before-after-hook/**
-!node_modules/deprecation/**
-!node_modules/once/**
-!node_modules/wrappy/**
 package-lock.json
