@@ -75,7 +75,7 @@ try {
         const workspaceSymbolModule = require('./workspaceSymbolProvider');
         KipWorkspaceSymbolProvider = workspaceSymbolModule.KipWorkspaceSymbolProvider;
     } catch (e) {
-        if (DEBUG) console.warn('Workspace symbol provider not available:', e instanceof Error ? e.message : String(e));
+        // Workspace symbol provider not available
     }
     
     try {
@@ -336,13 +336,11 @@ function registerLSPProviders(
 }
 
 function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.DocumentSelector): LanguageClientType | null {
-    log('initializeLSP called');
     const path = require('path');
     const fs = require('fs');
 
     // Use our own TypeScript LSP server
     const serverPath = context.asAbsolutePath(path.join('out', 'server', 'server.js'));
-    log(`Server path: ${serverPath}`);
 
     // Check if server exists
     if (!fs.existsSync(serverPath)) {
