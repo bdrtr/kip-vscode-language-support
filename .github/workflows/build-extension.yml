@@ -43,12 +43,32 @@ jobs:
     - name: Package extension
       run: npm run package
       
-    - name: Get version from package.json
-      id: get_version
+    - name: Get version and create tag
+      id: version_info
       run: |
         VERSION=$(node -p "require('./package.json').version")
+        SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        
+        # For main/master branch, use version + short SHA for unique tag
+        if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+          TAG_NAME="v${VERSION}-${SHORT_SHA}"
+          RELEASE_NAME="v${VERSION} (${SHORT_SHA})"
+        # For tags, use the tag name
+        elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          RELEASE_NAME="Release ${TAG_NAME}"
+        else
+          TAG_NAME="v${VERSION}-${SHORT_SHA}"
+          RELEASE_NAME="v${VERSION} (${SHORT_SHA})"
+        fi
+        
         echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+        echo "release_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
         echo "Version: $VERSION"
+        echo "Tag: $TAG_NAME"
+        echo "Release: $RELEASE_NAME"
     
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
@@ -57,26 +77,33 @@ jobs:
         path: '*.vsix'
         retention-days: 30
     
-    - name: Create or Update Release
+    - name: Create Release
       if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
       uses: softprops/action-gh-release@v1
       with:
         files: '*.vsix'
-        tag_name: v${{ steps.get_version.outputs.version }}
-        name: Release v${{ steps.get_version.outputs.version }}
+        tag_name: ${{ steps.version_info.outputs.tag_name }}
+        name: ${{ steps.version_info.outputs.release_name }}
         body: |
-          ## Changes
-          - Automated build from commit ${{ github.sha }}
-          - Built on ${{ github.event.head_commit.timestamp || github.run_started_at }}
+          ## Latest Build
+          
+          **Version:** ${{ steps.version_info.outputs.version }}  
+          **Commit:** [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
+          **Built:** ${{ github.event.head_commit.timestamp || github.run_started_at }}
           
           ## Installation
-          1. Download the `.vsix` file from Assets below
+          
+          1. Download the `.vsix` file from **Assets** below
           2. Open VS Code
           3. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS)
           4. Type "Extensions: Install from VSIX..."
           5. Select the downloaded file
+          
+          ## Changes
+          
+          See [commit history](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
         draft: false
-        prerelease: false
-        make_latest: true
+        prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        make_latest: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
