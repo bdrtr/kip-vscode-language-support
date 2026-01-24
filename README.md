@@ -44,6 +44,9 @@ Veya VS Code içinden:
 - ✅ **Code Formatting** - Otomatik kod formatlama (`Shift+Alt+F`)
 - ✅ **Run Command** - Kip dosyalarını çalıştırma (`Ctrl+Shift+R`)
 - ✅ **Error Diagnostics** - Gerçek zamanlı hata tespiti
+- ✅ **Otomatik Binary İndirme** - Kip derleyicisi bulunamazsa GitHub Releases'dan otomatik indirir
+- ✅ **Platform Desteği** - Linux, macOS (Intel/ARM), Windows için binary'ler
+- ✅ **Binary Cache** - İndirilen binary'ler cache'lenir, sonraki kullanımlarda hızlı erişim
 
 ### LSP Özellikleri (Language Server Protocol)
 - ✅ **Go to Definition** (`F12`) - Tanıma git
@@ -60,6 +63,11 @@ Veya VS Code içinden:
 1. `.kip` uzantılı dosya açın
 2. Sağ üstteki **▶ Run** butonuna basın
 3. Veya **Ctrl+Shift+R** kısayolu
+
+**İlk Kullanım:**
+- Eğer sistemde `kip` derleyicisi yoksa, extension otomatik olarak GitHub Releases'dan indirme seçeneği sunar
+- Binary indirildikten sonra cache'lenir ve sonraki kullanımlarda otomatik olarak kullanılır
+- Tüm platformlar için (Linux, macOS Intel/ARM, Windows) binary desteği mevcuttur
 
 ### Kod Formatlama
 ```
@@ -160,13 +168,32 @@ npm run release:major  # 1.1.0 -> 2.0.0 (büyük değişiklik)
 Extension ayarları (`settings.json`):
 ```json
 {
-  "kip.compilerPath": "",           // Kip derleyicisinin yolu
-  "kip.lspPath": "",                // Kip LSP sunucusunun yolu
+  "kip.compilerPath": "",           // Kip derleyicisinin tam yolu (boş bırakılırsa otomatik bulunur)
+  "kip.lspPath": "",                // Kip LSP sunucusunun tam yolu (boş bırakılırsa otomatik bulunur)
   "kip.enableCodeLens": true,       // Code Lens'i etkinleştir
   "kip.formatOnSave": false,        // Kaydetme sırasında formatla
   "kip.enableWorkspaceSymbols": true // Workspace sembol araması
 }
 ```
+
+### Binary Bulma Sırası
+
+Extension, `kip` derleyicisini şu sırayla arar:
+
+1. **`kip.compilerPath` ayarı** - VS Code ayarlarında belirtilen yol
+2. **Cache'deki binary** - Daha önce indirilen binary (extension global storage)
+3. **Varsayılan kurulum yolu** - `~/.local/bin/kip` (Linux/macOS)
+4. **Sistem PATH'i** - Sistem PATH'inde `kip` komutu
+5. **GitHub Releases'dan indirme** - Otomatik olarak GitHub'dan indirir (kullanıcı onayı ile)
+
+### Otomatik Binary İndirme
+
+Extension, `kip` derleyicisi bulunamazsa:
+- GitHub Releases'dan indirme seçeneği sunar
+- Önce `algorynth/kip-vscode-language-support` repo'sundan arar
+- Bulamazsa `kip-dili/kip` repo'sundan arar
+- İndirilen binary cache'lenir (`~/.config/Code/User/globalStorage/algorynth.kip-language/kip-binaries/`)
+- Sonraki kullanımlarda cache'den otomatik kullanılır
 
 ## 🐛 Sorun Giderme
 
@@ -177,6 +204,16 @@ npm run quick-check
 ```
 
 ### Yaygın Sorunlar
+
+**Kip derleyicisi bulunamıyor:**
+- Extension otomatik olarak GitHub Releases'dan indirme seçeneği sunar
+- Veya VS Code ayarlarından `kip.compilerPath` ayarını kullanarak manuel yol belirtebilirsiniz
+- Sistem PATH'ine `kip` binary'sini ekleyebilirsiniz
+
+**Binary indirme başarısız:**
+- İnternet bağlantınızı kontrol edin
+- GitHub Releases'da binary'lerin mevcut olduğundan emin olun
+- Manuel olarak binary'leri indirip `kip.compilerPath` ayarına yol belirtebilirsiniz
 
 **LSP modülü yüklenemiyor:**
 ```bash
