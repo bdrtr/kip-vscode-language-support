@@ -8,6 +8,8 @@ import { KipDiagnosticProvider } from './diagnosticProvider';
 type LanguageClientType = import('vscode-languageclient/node').LanguageClient;
 type ErrorAction = import('vscode-languageclient/node').ErrorAction;
 type CloseAction = import('vscode-languageclient/node').CloseAction;
+type Trace = import('vscode-languageclient/node').Trace;
+type TraceFormat = import('vscode-languageclient/node').TraceFormat;
 
 let LanguageClient: typeof import('vscode-languageclient/node').LanguageClient | null = null;
 let TransportKind: typeof import('vscode-languageclient/node').TransportKind | null = null;
@@ -64,6 +66,39 @@ function loadLSPProviders() {
     loadLSPProvider('workspaceSymbolProvider', 'KipWorkspaceSymbolProvider');
     loadLSPProvider('semanticProvider', 'SemanticProvider');
 }
+
+// Global filter for LSP "no handler" messages
+function shouldFilterMessage(message: string): boolean {
+    return message.includes('no handler for') || 
+           message.includes('SMethod_SetTrace') || 
+           message.includes('SMethod_Initialized');
+}
+
+// Override console methods globally to filter LSP warnings
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+const originalConsoleLog = console.log;
+
+console.error = function(...args: any[]) {
+    const message = args.map(String).join(' ');
+    if (!shouldFilterMessage(message)) {
+        originalConsoleError.apply(console, args);
+    }
+};
+
+console.warn = function(...args: any[]) {
+    const message = args.map(String).join(' ');
+    if (!shouldFilterMessage(message)) {
+        originalConsoleWarn.apply(console, args);
+    }
+};
+
+console.log = function(...args: any[]) {
+    const message = args.map(String).join(' ');
+    if (!shouldFilterMessage(message)) {
+        originalConsoleLog.apply(console, args);
+    }
+};
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Kip Language Support extension activated');
@@ -193,18 +228,14 @@ export function activate(context: vscode.ExtensionContext) {
                             const originalAppendLine = channel.appendLine?.bind(channel);
                             
                             channel.append = function(value: string) {
-                                if (!value.includes('no handler for') && 
-                                    !value.includes('SMethod_SetTrace') && 
-                                    !value.includes('SMethod_Initialized')) {
+                                if (!shouldFilterMessage(value)) {
                                     originalAppend(value);
                                 }
                             };
                             
                             if (originalAppendLine) {
                                 channel.appendLine = function(value: string) {
-                                    if (!value.includes('no handler for') && 
-                                        !value.includes('SMethod_SetTrace') && 
-                                        !value.includes('SMethod_Initialized')) {
+                                    if (!shouldFilterMessage(value)) {
                                         originalAppendLine(value);
                                     }
                                 };
@@ -221,9 +252,7 @@ export function activate(context: vscode.ExtensionContext) {
             }).catch((err) => {
                 const errMsg = err instanceof Error ? err.message : String(err);
                 // Ignore "no handler" errors
-                if (!errMsg.includes('no handler for') && 
-                    !errMsg.includes('SetTrace') && 
-                    !errMsg.includes('Initialized')) {
+                if (!shouldFilterMessage(errMsg)) {
                     console.error('LSP failed to start:', err);
                     vscode.window.showWarningMessage(
                         'Kip LSP başlatılamadı. LSP özellikleri çalışmayabilir.',
@@ -239,9 +268,7 @@ export function activate(context: vscode.ExtensionContext) {
     } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         // Ignore "no handler" errors
-        if (!errMsg.includes('no handler for') && 
-            !errMsg.includes('SetTrace') && 
-            !errMsg.includes('Initialized')) {
+        if (!shouldFilterMessage(errMsg)) {
             console.error('LSP initialization failed:', err);
             vscode.window.showErrorMessage(
                 'LSP başlatılamadı. Extension düzgün çalışmayabilir.',
@@ -403,30 +430,36 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
     
     // Filter out "no handler" warnings
     lspOutputChannel.append = function(value: string) {
-        const filtered = !value.includes('no handler for') && 
-                        !value.includes('SMethod_SetTrace') && 
-                        !value.includes('SMethod_Initialized');
-        if (filtered) {
+        if (!shouldFilterMessage(value)) {
             originalAppend(value);
         }
     };
     
     lspOutputChannel.appendLine = function(value: string) {
-        const filtered = !value.includes('no handler for') && 
-                        !value.includes('SMethod_SetTrace') && 
-                        !value.includes('SMethod_Initialized');
-        if (filtered) {
+        if (!shouldFilterMessage(value)) {
             originalAppendLine(value);
         }
     };
+
 
     const clientOptions: any = {
         documentSelector: [{ scheme: 'file', language: 'kip' }],
         synchronize: {
             fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
         },
-        outputChannel: lspOutputChannel
+        outputChannel: lspOutputChannel,
+        traceOutputChannel: vscode.window.createOutputChannel('Kip LSP Trace', { log: true })
     };
+    
+    // Try to set trace to Off if available
+    try {
+        const TraceEnum = require('vscode-languageclient/node').Trace;
+        if (TraceEnum && TraceEnum.Off !== undefined) {
+            clientOptions.trace = TraceEnum.Off;
+        }
+    } catch (e) {
+        // Trace enum not available, ignore
+    }
 
     // Add error handler if available
     if (ErrorActionEnum && CloseActionEnum) {
@@ -435,11 +468,7 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         clientOptions.errorHandler = {
             error: (error: Error, message: any, count: number) => {
                 // Ignore "no handler" errors for optional LSP methods
-                if (error.message && (
-                    error.message.includes('no handler for') ||
-                    error.message.includes('SetTrace') ||
-                    error.message.includes('Initialized')
-                )) {
+                if (error.message && shouldFilterMessage(error.message)) {
                     return { action: ErrorAction.Continue };
                 }
                 return { action: ErrorAction.Continue };
@@ -457,6 +486,24 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         },
         clientOptions
     );
+    
+    // Additional filtering: intercept client's internal logging
+    try {
+        const clientAny = client as any;
+        // Override any internal log methods
+        if (clientAny._tracer) {
+            const originalLog = clientAny._tracer.log;
+            if (originalLog) {
+                clientAny._tracer.log = function(message: string) {
+                    if (!shouldFilterMessage(message)) {
+                        originalLog.call(this, message);
+                    }
+                };
+            }
+        }
+    } catch (e) {
+        // Ignore errors
+    }
 
     return client;
 }
