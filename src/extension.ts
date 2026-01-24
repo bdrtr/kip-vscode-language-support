@@ -68,12 +68,19 @@ function loadLSPProviders() {
 }
 
 // Global filter for LSP "no handler" messages
+// kip-lsp only implements: DidOpen, DidChange, DidSave, Hover, Definition, Completion, Formatting
+// It does NOT implement: Initialized, SetTrace, CodeLens, SemanticTokens, etc.
 function shouldFilterMessage(message: string): boolean {
     const msg = String(message).toLowerCase();
     return msg.includes('no handler for') || 
            msg.includes('smethod_settrace') || 
            msg.includes('smethod_initialized') ||
-           msg.includes('lsp: no handler');
+           msg.includes('smethod_textdocumentcodelens') ||
+           msg.includes('smethod_semantictokens') ||
+           msg.includes('smethod_semantictokensfull') ||
+           msg.includes('lsp: no handler') ||
+           msg.includes('sending notification') && (msg.includes('failed') || msg.includes('error')) ||
+           msg.includes('workspace/didchangeconfiguration') && msg.includes('failed');
 }
 
 // Override console methods globally to filter LSP warnings
@@ -523,12 +530,18 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
             error: (error: Error, message: any, count: number) => {
                 // Ignore "no handler" errors for optional LSP methods
                 const errMsg = error?.message || String(message || '');
+                const errMsgLower = errMsg.toLowerCase();
+                
+                // Filter all known LSP issues that kip-lsp doesn't support
                 if (shouldFilterMessage(errMsg) || 
-                    errMsg.includes('failed') || 
-                    errMsg.includes('notification') ||
-                    errMsg.includes('didOpen') ||
-                    errMsg.includes('didChangeConfiguration')) {
-                    // Silently continue for known issues
+                    errMsgLower.includes('failed') || 
+                    errMsgLower.includes('notification') ||
+                    errMsgLower.includes('didopen') ||
+                    errMsgLower.includes('didchangeconfiguration') ||
+                    errMsgLower.includes('codelens') ||
+                    errMsgLower.includes('semantictokens') ||
+                    errMsgLower.includes('no handler')) {
+                    // Silently continue for known issues (kip-lsp doesn't support these features)
                     return { action: ErrorAction.Continue };
                 }
                 // For other errors, also continue but log (if not filtered)
@@ -574,13 +587,23 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
                     connection.sendNotification = function(method: string, params?: any) {
                         const methodStr = String(method).toLowerCase();
                         // Don't send unsupported notifications (matching Haskell's handler list)
-                        if (methodStr === 'initialized' || methodStr.includes('settrace')) {
+                        // kip-lsp only supports: DidOpen, DidChange, DidSave
+                        if (methodStr === 'initialized' || 
+                            methodStr.includes('settrace') ||
+                            methodStr.includes('codelens') ||
+                            methodStr.includes('semantictokens')) {
                             return Promise.resolve();
                         }
                         // Wrap in try-catch to handle notification failures
                         try {
                             return originalSend(method, params).catch((err: any) => {
-                                // Silently ignore notification failures
+                                // Silently ignore notification failures (server doesn't support it)
+                                const errMsg = String(err?.message || err || '').toLowerCase();
+                                if (errMsg.includes('failed') || 
+                                    errMsg.includes('no handler') ||
+                                    errMsg.includes('didchangeconfiguration')) {
+                                    return Promise.resolve();
+                                }
                                 return Promise.resolve();
                             });
                         } catch (e) {
