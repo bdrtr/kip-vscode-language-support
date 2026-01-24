@@ -6,9 +6,13 @@ import { KipFormattingProvider } from './formattingProvider';
 import { KipDiagnosticProvider } from './diagnosticProvider';
 
 type LanguageClientType = import('vscode-languageclient/node').LanguageClient;
+type ErrorAction = import('vscode-languageclient/node').ErrorAction;
+type CloseAction = import('vscode-languageclient/node').CloseAction;
 
 let LanguageClient: typeof import('vscode-languageclient/node').LanguageClient | null = null;
 let TransportKind: typeof import('vscode-languageclient/node').TransportKind | null = null;
+let ErrorActionEnum: typeof import('vscode-languageclient/node').ErrorAction | null = null;
+let CloseActionEnum: typeof import('vscode-languageclient/node').CloseAction | null = null;
 
 const LSP_PROVIDERS = {
     KipDefinitionProvider: null as typeof import('./definitionProvider').KipDefinitionProvider | null,
@@ -27,6 +31,8 @@ function loadLSPModule() {
         const lspModule = require('vscode-languageclient/node');
         LanguageClient = lspModule.LanguageClient;
         TransportKind = lspModule.TransportKind;
+        ErrorActionEnum = lspModule.ErrorAction;
+        CloseActionEnum = lspModule.CloseAction;
         return true;
     } catch (err) {
         console.warn('LSP module not available:', err);
@@ -337,12 +343,16 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         transport: TransportKind.stdio
     };
 
-    const clientOptions = {
+    const clientOptions: any = {
         documentSelector: [{ scheme: 'file', language: 'kip' }],
         synchronize: {
             fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
-        },
-        errorHandler: {
+        }
+    };
+
+    // Add error handler if available
+    if (ErrorActionEnum && CloseActionEnum) {
+        clientOptions.errorHandler = {
             error: (error: Error, message: any, count: number) => {
                 // Ignore "no handler" errors for optional LSP methods
                 if (error.message && (
@@ -350,13 +360,13 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
                     error.message.includes('SetTrace') ||
                     error.message.includes('Initialized')
                 )) {
-                    return { action: 'continue' as const };
+                    return { action: ErrorActionEnum.Continue };
                 }
-                return { action: 'continue' as const };
+                return { action: ErrorActionEnum.Continue };
             },
-            closed: () => ({ action: 'restart' as const })
-        }
-    };
+            closed: () => ({ action: CloseActionEnum.Restart })
+        };
+    }
 
     const client = new LanguageClient(
         'kipLanguageServer',
