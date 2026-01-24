@@ -435,21 +435,26 @@ function parseFunctionCall(tokens: Token[], startIndex: number): { node: Functio
     }
     
     const args: Expression[] = [];
-    let i = startIndex;
-    let parenCount = 0;
+    let i = startIndex + 1; // Skip opening '('
+    let parenCount = 1; // We're inside the function call parentheses
+    const visited = new Set<number>(); // Track visited indices to prevent infinite loops
     
     // Parse arguments (each argument is an expression in parentheses)
-    while (i < tokens.length) {
+    while (i < tokens.length && parenCount > 0) {
+        // Prevent infinite loop by tracking visited indices
+        if (visited.has(i)) {
+            break;
+        }
+        visited.add(i);
+        
         if (tokens[i].token === '(') {
             parenCount++;
-            if (parenCount === 1) {
-                // Start of an argument
-                const argExpr = parseExpression(tokens, i);
-                if (argExpr) {
-                    args.push(argExpr.node);
-                    i = argExpr.nextIndex;
-                    continue;
-                }
+            // Try to parse this as an expression
+            const argExpr = parseExpression(tokens, i);
+            if (argExpr) {
+                args.push(argExpr.node);
+                i = argExpr.nextIndex;
+                continue;
             }
         } else if (tokens[i].token === ')') {
             parenCount--;

@@ -723,6 +723,137 @@ connection.onRequest('textDocument/semanticTokens/full', (params: SemanticTokens
     }
 });
 
+// Ensure semantic tokens are returned correctly
+connection.onRequest('textDocument/semanticTokens/range', (params: SemanticTokensRangeParams): SemanticTokens => {
+    try {
+        const document = documents.get(params.textDocument.uri);
+        if (!document) {
+            return { data: [] };
+        }
+        
+        const state = documentStates.get(params.textDocument.uri);
+        if (!state) {
+            return { data: [] };
+        }
+        
+        // For range requests, return full tokens (can be optimized later)
+        const fullResult = connection.sendRequest('textDocument/semanticTokens/full', {
+            textDocument: { uri: params.textDocument.uri }
+        });
+        
+        // Actually, we need to handle this synchronously
+        // So we'll just call the same logic
+        const text = document.getText();
+        const tokens: number[] = [];
+        let prevLine = 0;
+        let prevChar = 0;
+        
+        const tokenPattern = /\d+(?:'?\p{L}+)?|\p{L}+(?:-\p{L}+)*|[(),.]|"[^"]*"/gu;
+        let match;
+        
+        const allTokens: Array<{ token: string; start: number; line: number; char: number }> = [];
+        while ((match = tokenPattern.exec(text)) !== null) {
+            const token = match[0];
+            const start = match.index;
+            const textBefore = text.substring(0, start);
+            const linesBefore = textBefore.split('\n');
+            const line = linesBefore.length - 1;
+            const char = linesBefore[linesBefore.length - 1].length;
+            allTokens.push({ token, start, line, char });
+        }
+        
+        const range = params.range;
+        
+        for (let i = 0; i < allTokens.length; i++) {
+            const token = allTokens[i].token;
+            const start = allTokens[i].start;
+            const textBefore = text.substring(0, start);
+            const linesBefore = textBefore.split('\n');
+            const line = linesBefore.length - 1;
+            const char = linesBefore[linesBefore.length - 1].length;
+            
+            // Check if token is within requested range
+            if (line < range.start.line || line > range.end.line) {
+                continue;
+            }
+            if (line === range.start.line && char < range.start.character) {
+                continue;
+            }
+            if (line === range.end.line && char + token.length > range.end.character) {
+                continue;
+            }
+            
+            let tokenType: number | null = null;
+            
+            if (token.startsWith('"')) {
+                tokenType = 3; // string
+            } else if (/^\d/.test(token)) {
+                tokenType = 4; // number
+            } else if (state.keywords.has(token)) {
+                tokenType = 0; // keyword
+            } else {
+                let foundType = false;
+                
+                // Check 2-word phrases
+                if (i + 1 < allTokens.length) {
+                    const twoWord = `${token} ${allTokens[i + 1].token}`;
+                    if (state.types.has(twoWord)) {
+                        tokenType = 5; // type
+                        foundType = true;
+                    }
+                }
+                
+                // Check 3-word phrases
+                if (!foundType && i + 2 < allTokens.length) {
+                    const threeWord = `${token} ${allTokens[i + 1].token} ${allTokens[i + 2].token}`;
+                    if (state.types.has(threeWord)) {
+                        tokenType = 5; // type
+                        foundType = true;
+                    }
+                }
+                
+                // Check if this word is part of a type
+                if (!foundType) {
+                    for (const [typeWord, fullType] of state.typePhrases.entries()) {
+                        if (token.includes(typeWord) || typeWord.includes(token)) {
+                            const baseWord = typeWord.split(' ')[0];
+                            if (token.startsWith(baseWord) || baseWord.startsWith(token.substring(0, 3))) {
+                                tokenType = 5; // type
+                                foundType = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Check single word types
+                if (!foundType && state.types.has(token)) {
+                    tokenType = 5; // type
+                } else if (!foundType && state.functions.has(token)) {
+                    tokenType = 1; // function
+                } else if (!foundType && (state.variables.has(token) || state.variableRefs.has(token))) {
+                    tokenType = 2; // variable (definition or reference)
+                }
+            }
+            
+            if (tokenType !== null) {
+                const deltaLine = line - prevLine;
+                const deltaChar = deltaLine === 0 ? char - prevChar : char;
+                
+                tokens.push(deltaLine, deltaChar, token.length, tokenType, 0);
+                
+                prevLine = line;
+                prevChar = char;
+            }
+        }
+        
+        return { data: tokens };
+    } catch (error) {
+        logError('Error in semanticTokens/range', error);
+        return { data: [] };
+    }
+});
+
 // Workspace symbols handler
 connection.onWorkspaceSymbol((params: WorkspaceSymbolParams): SymbolInformation[] => {
     try {
