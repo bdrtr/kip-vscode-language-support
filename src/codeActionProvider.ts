@@ -22,6 +22,12 @@ export class KipCodeActionProvider implements vscode.CodeActionProvider {
     ): Promise<vscode.CodeAction[]> {
         const actions: vscode.CodeAction[] = [];
 
+        // LSP client'ın hazır olup olmadığını kontrol et
+        if (!this.isClientReady()) {
+            console.log('LSP client not ready, deriving code actions from diagnostics');
+            return this.getFallbackCodeActions(document, range, context);
+        }
+
         // Önce LSP'den code actions iste
         try {
             const result = await this.client.sendRequest('textDocument/codeAction', {
@@ -66,8 +72,32 @@ export class KipCodeActionProvider implements vscode.CodeActionProvider {
             }
         } catch (error) {
             // LSP code actions yoksa, diagnostic'lerden türet
-            console.log('LSP code actions not available, deriving from diagnostics');
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            if (errorMsg.includes('no handler') || errorMsg.includes('not supported')) {
+                console.log('LSP code actions not supported by server, deriving from diagnostics');
+            } else {
+                console.warn('LSP code actions request failed:', errorMsg);
+            }
         }
+
+        return this.getFallbackCodeActions(document, range, context);
+    }
+
+    private isClientReady(): boolean {
+        try {
+            const clientState = (this.client as any).state;
+            return clientState === 2; // Running
+        } catch (e) {
+            return false;
+        }
+    }
+
+    private async getFallbackCodeActions(
+        document: vscode.TextDocument,
+        range: vscode.Range | vscode.Selection,
+        context: vscode.CodeActionContext
+    ): Promise<vscode.CodeAction[]> {
+        const actions: vscode.CodeAction[] = [];
 
         // Diagnostic'lerden code actions türet
         for (const diagnostic of context.diagnostics) {

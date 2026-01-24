@@ -19,7 +19,7 @@ export class KipHoverProvider implements vscode.HoverProvider {
         token: vscode.CancellationToken
     ): Promise<vscode.Hover | null> {
         // First, try LSP hover (matching Haskell: inferType from expression at position)
-        if (this.lspClient) {
+        if (this.lspClient && this.isClientReady()) {
             try {
                 const lspHover: any = await this.lspClient.sendRequest('textDocument/hover', {
                     textDocument: {
@@ -41,52 +41,35 @@ export class KipHoverProvider implements vscode.HoverProvider {
                 }
             } catch (error) {
                 // LSP hover not available, fallback to builtin
-                console.log('LSP hover not available, using builtin');
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                // Silently fallback to builtin - don't log "not supported" messages
+                // Handler exists in server, but capabilities might not be set correctly
+                if (!errorMsg.includes('no handler') && !errorMsg.includes('not supported')) {
+                    console.warn('LSP hover request failed:', errorMsg);
+                }
             }
-        }
-
-        // Fallback: Builtin hover (matching Haskell's builtin knowledge)
-        const range = document.getWordRangeAtPosition(position);
-        if (!range) {
+        } else if (this.lspClient) {
+            // LSP not ready - return null (LSP is required)
             return null;
         }
 
-        let word = document.getText(range);
-
-        // "ya da" gibi iki kelimelik ifadeleri kontrol et
-        const lineText = document.lineAt(position.line).text;
-        const wordStart = range.start.character;
-
-        // "ya da" kontrolü
-        if (word === 'ya' && lineText.substring(wordStart, wordStart + 5) === 'ya da') {
-            word = 'ya da';
-        }
-
-        // Dokümantasyonu bul
-        const doc = builtinDocs[word];
-        if (!doc) {
+        // LSP is required - no builtin fallback
+        if (!this.lspClient || !this.isClientReady()) {
             return null;
         }
 
-        // Markdown içeriği oluştur
-        const markdown = new vscode.MarkdownString();
-        markdown.isTrusted = true;
+        // LSP is required - no builtin fallback
+        return null;
+    }
 
-        // Kategori bilgisi
-        const catInfo = categoryInfo[doc.category];
-        markdown.appendMarkdown(`${catInfo.icon} **${catInfo.label}**\n\n`);
-
-        // Signature
-        markdown.appendMarkdown(`\`\`\`kip\n${doc.signature}\n\`\`\`\n\n`);
-
-        // Açıklama
-        markdown.appendMarkdown(`${doc.description}\n\n`);
-
-        // Örnek
-        markdown.appendMarkdown(`**Örnek:**\n`);
-        markdown.appendMarkdown(`\`\`\`kip\n${doc.example}\n\`\`\``);
-
-        return new vscode.Hover(markdown, range);
+    private isClientReady(): boolean {
+        if (!this.lspClient) return false;
+        try {
+            const clientState = (this.lspClient as any).state;
+            return clientState === 2; // Running
+        } catch (e) {
+            return false;
+        }
     }
 
     private convertLSPHoverContents(contents: any): vscode.MarkdownString | null {

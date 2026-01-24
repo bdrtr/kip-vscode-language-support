@@ -10,6 +10,9 @@ import type { LanguageClient as LanguageClientType } from 'vscode-languageclient
 let LanguageClient: typeof import('vscode-languageclient/node').LanguageClient | null = null;
 let TransportKind: typeof import('vscode-languageclient/node').TransportKind | null = null;
 
+// Logging helper - only log errors in production
+const DEBUG = process.env.NODE_ENV !== 'production';
+
 // LSP Provider imports - sadece LSP mevcut olduğunda kullanılacak
 let KipDefinitionProvider: typeof import('./definitionProvider').KipDefinitionProvider | null = null;
 let KipReferenceProvider: typeof import('./referenceProvider').KipReferenceProvider | null = null;
@@ -20,114 +23,128 @@ let KipCodeLensProvider: typeof import('./codeLensProvider').KipCodeLensProvider
 let KipSymbolProvider: typeof import('./symbolProvider').KipSymbolProvider | null = null;
 let KipWorkspaceSymbolProvider: typeof import('./workspaceSymbolProvider').KipWorkspaceSymbolProvider | null = null;
 let SemanticProvider: typeof import('./semanticProvider').SemanticProvider | null = null;
+let KipSemanticTokensProvider: typeof import('./semanticTokensProvider').KipSemanticTokensProvider | null = null;
 
 try {
-    console.log('🔄 Attempting to load LSP module...');
     const lspModule = require('vscode-languageclient/node');
     LanguageClient = lspModule.LanguageClient;
     TransportKind = lspModule.TransportKind;
-    console.log('✅ LSP module loaded successfully');
     
-    // LSP provider'larını yükle (her biri ayrı try-catch ile)
-    // Not: Provider'lar LanguageClient'a bağımlı olduğu için sadece LSP modülü yüklendikten sonra yüklenebilir
-    console.log('🔄 Attempting to load LSP providers...');
-    
+    // LSP provider'larını yükle
     try {
-        console.log('🔄 Loading definition provider...');
         const definitionModule = require('./definitionProvider');
         KipDefinitionProvider = definitionModule.KipDefinitionProvider;
-        console.log('✅ Definition provider loaded');
     } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        const stack = e instanceof Error ? e.stack : '';
-        console.warn('⚠️ Definition provider not available:', errMsg);
-        if (stack) console.warn('Stack:', stack);
+        if (DEBUG) console.warn('Definition provider not available:', e instanceof Error ? e.message : String(e));
     }
     
     try {
-        console.log('🔄 Loading reference provider...');
         const referenceModule = require('./referenceProvider');
         KipReferenceProvider = referenceModule.KipReferenceProvider;
         KipDocumentHighlightProvider = referenceModule.KipDocumentHighlightProvider;
-        console.log('✅ Reference provider loaded');
     } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.warn('⚠️ Reference provider not available:', errMsg);
+        if (DEBUG) console.warn('Reference provider not available:', e instanceof Error ? e.message : String(e));
     }
     
     try {
-        console.log('🔄 Loading rename provider...');
         const renameModule = require('./renameProvider');
         KipRenameProvider = renameModule.KipRenameProvider;
-        console.log('✅ Rename provider loaded');
     } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.warn('⚠️ Rename provider not available:', errMsg);
+        if (DEBUG) console.warn('Rename provider not available:', e instanceof Error ? e.message : String(e));
     }
     
     try {
-        console.log('🔄 Loading code action provider...');
         const codeActionModule = require('./codeActionProvider');
         KipCodeActionProvider = codeActionModule.KipCodeActionProvider;
-        console.log('✅ Code action provider loaded');
     } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.warn('⚠️ Code action provider not available:', errMsg);
+        if (DEBUG) console.warn('Code action provider not available:', e instanceof Error ? e.message : String(e));
     }
     
     try {
-        console.log('🔄 Loading code lens provider...');
         const codeLensModule = require('./codeLensProvider');
         KipCodeLensProvider = codeLensModule.KipCodeLensProvider;
-        console.log('✅ Code lens provider loaded');
     } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.warn('⚠️ Code lens provider not available:', errMsg);
+        if (DEBUG) console.warn('Code lens provider not available:', e instanceof Error ? e.message : String(e));
     }
     
     try {
-        console.log('🔄 Loading symbol provider...');
         const symbolModule = require('./symbolProvider');
         KipSymbolProvider = symbolModule.KipSymbolProvider;
-        console.log('✅ Symbol provider loaded');
     } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.warn('⚠️ Symbol provider not available:', errMsg);
+        if (DEBUG) console.warn('Symbol provider not available:', e instanceof Error ? e.message : String(e));
     }
     
     try {
-        console.log('🔄 Loading workspace symbol provider...');
         const workspaceSymbolModule = require('./workspaceSymbolProvider');
         KipWorkspaceSymbolProvider = workspaceSymbolModule.KipWorkspaceSymbolProvider;
-        console.log('✅ Workspace symbol provider loaded');
     } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.warn('⚠️ Workspace symbol provider not available:', errMsg);
+        if (DEBUG) console.warn('Workspace symbol provider not available:', e instanceof Error ? e.message : String(e));
     }
     
     try {
-        console.log('🔄 Loading semantic provider...');
         const semanticModule = require('./semanticProvider');
         SemanticProvider = semanticModule.SemanticProvider;
-        console.log('✅ Semantic provider loaded');
     } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.warn('⚠️ Semantic provider not available:', errMsg);
+        if (DEBUG) console.warn('Semantic provider not available:', e instanceof Error ? e.message : String(e));
     }
     
-    console.log('✅ LSP providers loaded successfully');
+    try {
+        const semanticTokensModule = require('./semanticTokensProvider');
+        KipSemanticTokensProvider = semanticTokensModule.KipSemanticTokensProvider;
+    } catch (e) {
+        if (DEBUG) console.warn('Semantic tokens provider not available:', e instanceof Error ? e.message : String(e));
+    }
 } catch (err) {
-    console.warn('⚠️ LSP module not available, extension will work without LSP features');
     const errMsg = err instanceof Error ? err.message : String(err);
-    const errStack = err instanceof Error ? err.stack : '';
-    console.warn('⚠️ LSP error details:', errMsg);
-    if (errStack) {
-        console.warn('⚠️ LSP error stack:', errStack);
+    console.error('LSP module not available:', errMsg);
+}
+
+// Output channel for logging
+let outputChannel: vscode.OutputChannel | null = null;
+function log(message: string, ...args: any[]): void {
+    if (DEBUG) {
+        const timestamp = new Date().toISOString();
+        const logMessage = `[Extension ${timestamp}] ${message}${args.length > 0 ? ' ' + args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ') : ''}`;
+        console.log(logMessage);
+        if (outputChannel) {
+            outputChannel.appendLine(logMessage);
+        }
+    }
+}
+
+function logError(message: string, error: any): void {
+    const timestamp = new Date().toISOString();
+    const errorMessage = `[Extension ${timestamp}] ERROR: ${message}`;
+    
+    console.error(errorMessage);
+    if (outputChannel) {
+        outputChannel.appendLine(errorMessage);
+    }
+    
+    if (error instanceof Error) {
+        const details = `  Message: ${error.message}${DEBUG ? `\n  Stack: ${error.stack}` : ''}`;
+        console.error(details);
+        if (outputChannel) {
+            outputChannel.appendLine(details);
+        }
+    } else {
+        const details = `  Error object: ${JSON.stringify(error, null, 2)}`;
+        console.error(details);
+        if (outputChannel) {
+            outputChannel.appendLine(details);
+        }
     }
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Kip Language Support extension is now active!');
+    // Create output channel for logging
+    outputChannel = vscode.window.createOutputChannel('Kip Language Server');
+    if (DEBUG) {
+        outputChannel.show(true);
+    }
+    context.subscriptions.push(outputChannel);
+    
+    log('Extension activation started');
 
     const kipSelector: vscode.DocumentSelector = { scheme: 'file', language: 'kip' };
 
@@ -136,7 +153,6 @@ export function activate(context: vscode.ExtensionContext) {
     // ============================================
     const kipRunner = new KipRunner();
     const runCommand = vscode.commands.registerCommand('kip.runFile', async () => {
-        console.log('kip.runFile command executed');
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             vscode.window.showErrorMessage('No active Kip file');
@@ -151,168 +167,84 @@ export function activate(context: vscode.ExtensionContext) {
         await kipRunner.runFile(editor.document);
     });
     context.subscriptions.push(runCommand, kipRunner);
-    console.log('✅ kip.runFile command registered successfully');
 
     // ============================================
-    // FAZ 2: Temel Özellikler (LSP Olmadan)
+    // FAZ 2: LSP Server Başlatma (Zorunlu)
     // ============================================
-    
-    // Hover Provider - Builtin dokümantasyon (LSP hover will be added when LSP is ready)
-    // Matching Haskell: onHover uses inferType from expression at position
-    const hoverProviderInstance = new KipHoverProvider();
-    const hoverProvider = vscode.languages.registerHoverProvider(
-        kipSelector,
-        hoverProviderInstance
-    );
-    context.subscriptions.push(hoverProvider);
-    console.log('✅ Hover Provider registered');
-
-    // Completion Provider - Builtin öneriler (LSP completion will be added when LSP is ready)
-    // Matching Haskell: onCompletion uses parser state (ctxIdents, typeNames, funcNames)
-    // Haskell'de completion trigger characters: "-'" (Lsp.hs line 98)
-    const completionProviderInstance = new KipCompletionProvider();
-    const completionProvider = vscode.languages.registerCompletionItemProvider(
-        kipSelector,
-        completionProviderInstance,
-        '-', '\'' // Matching Haskell: optCompletionTriggerCharacters = Just "-'"
-    );
-    context.subscriptions.push(completionProvider);
-    console.log('✅ Completion Provider registered');
-    
-    // Store provider instances for LSP client injection (global scope)
-    (global as any)._kipHoverProvider = hoverProviderInstance;
-    (global as any)._kipCompletionProvider = completionProviderInstance;
-
-    // Formatting Provider
-    const formattingProvider = vscode.languages.registerDocumentFormattingEditProvider(
-        kipSelector,
-        new KipFormattingProvider()
-    );
-    const rangeFormattingProvider = vscode.languages.registerDocumentRangeFormattingEditProvider(
-        kipSelector,
-        new KipFormattingProvider()
-    );
-    context.subscriptions.push(formattingProvider, rangeFormattingProvider);
-    console.log('✅ Formatting Provider registered');
-
-    console.log('✅ All basic features registered successfully');
-
-    // ============================================
-    // FAZ 3: LSP Entegrasyonu (Opsiyonel)
-    // ============================================
+    // Tüm özellikler LSP üzerinden çalışacak - fallback yok
     let lspClient: LanguageClientType | null = null;
     let lspWorking = false;
     
     if (LanguageClient && TransportKind) {
+        log('LSP module available, initializing LSP...');
         try {
             lspClient = initializeLSP(context, kipSelector);
-            console.log('✅ LSP initialization started');
             
-            // LSP client'ı context'e ekle (cleanup için)
             if (lspClient) {
+                log('LSP client created successfully');
+                
+                // LSP client'ı context'e ekle (cleanup için)
                 context.subscriptions.push(lspClient);
                 
                 // LSP başlatma promise'ini yakala
-                lspClient.start().then(() => {
+                const client = lspClient;
+                const startTime = Date.now();
+                
+                // Add event listeners for debugging
+                if (DEBUG) {
+                    client.onDidChangeState((e) => {
+                        log(`LSP client state changed: ${e.oldState} -> ${e.newState}`);
+                    });
+                }
+                
+                // Monitor for errors
+                (client as any).onError?.((error: Error, message: any, count: number) => {
+                    logError(`LSP client error (count: ${count})`, error);
+                });
+                
+                // Add timeout to detect if start hangs
+                const startTimeout = setTimeout(() => {
+                    log(`WARNING: client.start() has been running for 10 seconds without completion`);
+                }, 10000);
+                
+                client.start().then(() => {
+                    clearTimeout(startTimeout);
+                    const duration = Date.now() - startTime;
                     lspWorking = true;
-                    console.log('✅ LSP is ready and working');
-                    
-                    // Update completion and hover providers with LSP client
-                    // (Matching Haskell: LSP provides completions from parser state and hover from type inference)
-                    updateProvidersWithLSP(lspClient!);
+                    log(`LSP started successfully in ${duration}ms`);
                     
                     // LSP provider'larını kayıt et
-                    registerLSPProviders(context, kipSelector, lspClient!);
-                }).catch((err) => {
+                    registerLSPProviders(context, kipSelector, client);
+                }).catch((err: unknown) => {
+                    const duration = Date.now() - startTime;
                     lspWorking = false;
-                    console.warn('⚠️ LSP failed to start:', err);
+                    logError(`LSP failed to start after ${duration}ms`, err);
+                    const errorMsg = err instanceof Error ? err.message : String(err);
+                    vscode.window.showErrorMessage(`Kip LSP server failed to start: ${errorMsg}`);
+                    outputChannel?.show(true);
                 });
+            } else {
+                logError('LSP client is null - initializeLSP returned null', null);
             }
         } catch (err) {
-            console.warn('⚠️ LSP initialization failed, continuing without LSP:', err);
+            logError('LSP initialization failed - LSP is required', err);
+            vscode.window.showErrorMessage('Kip LSP server could not be started. Extension features will not work.');
         }
     } else {
-        console.log('ℹ️ LSP not available, extension working in basic mode');
+        logError('LSP module not available - LSP is required', null);
+        vscode.window.showErrorMessage('LSP module not available. Extension features will not work.');
     }
 
     // ============================================
-    // FAZ 3.5: Diagnostics (LSP + Fallback)
+    // FAZ 3: Diagnostics (LSP Only)
     // ============================================
-    // Matching Haskell: parse errors + type check errors (analyzeDocument)
-    const diagnosticProvider = new KipDiagnosticProvider(); // LSP client will be set when available
-    context.subscriptions.push(diagnosticProvider);
+    // Diagnostics LSP server tarafından sağlanacak
+    // Fallback diagnostic provider yok - sadece LSP kullanılıyor
     
-    // Store diagnostic provider for LSP client injection
-    (global as any)._kipDiagnosticProvider = diagnosticProvider;
-
-    // Aktif belgeyi hemen kontrol et
-    if (vscode.window.activeTextEditor?.document.languageId === 'kip') {
-        diagnosticProvider.validateDocument(vscode.window.activeTextEditor.document);
-    }
-
-    // Belge açıldığında kontrol et
-    const onOpenDisposable = vscode.workspace.onDidOpenTextDocument((document) => {
-        if (document.languageId === 'kip') {
-            diagnosticProvider.validateDocument(document);
-        }
-    });
-    context.subscriptions.push(onOpenDisposable);
-
-    // Belge değiştiğinde kontrol et
-    const onChangeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
-        if (event.document.languageId === 'kip') {
-            diagnosticProvider.validateDocument(event.document);
-        }
-    });
-    context.subscriptions.push(onChangeDisposable);
-
-    // Belge kapatıldığında diagnostics'i temizle
-    const onCloseDisposable = vscode.workspace.onDidCloseTextDocument((document) => {
-        if (document.languageId === 'kip') {
-            diagnosticProvider.clearDiagnostics(document);
-        }
-    });
-    context.subscriptions.push(onCloseDisposable);
-
-    console.log('✅ Fallback Diagnostic Provider registered');
-
-    // ============================================
-    // FAZ 4: Gelişmiş Özellikler (LSP Opsiyonel)
-    // ============================================
-    // Bu özellikler LSP olmadan da çalışabilir (basit versiyonları)
-    // LSP başarılı olduğunda registerLSPProviders fonksiyonu çağrılacak
-    console.log('✅ Extension activation completed successfully');
+    log('Extension activation completed');
 }
 
-/**
- * Update builtin providers with LSP client (matching Haskell pattern)
- */
-function updateProvidersWithLSP(lspClient: LanguageClientType): void {
-    // Update hover, completion, and diagnostic providers with LSP client
-    // This allows them to combine builtin + LSP results (matching Haskell's pattern)
-    try {
-        const hoverProvider = (global as any)._kipHoverProvider as any;
-        const completionProvider = (global as any)._kipCompletionProvider as any;
-        const diagnosticProvider = (global as any)._kipDiagnosticProvider as any;
-        
-        if (hoverProvider && typeof hoverProvider.lspClient !== 'undefined') {
-            hoverProvider.lspClient = lspClient;
-            console.log('✅ Hover Provider updated with LSP client');
-        }
-        
-        if (completionProvider && typeof completionProvider.lspClient !== 'undefined') {
-            completionProvider.lspClient = lspClient;
-            console.log('✅ Completion Provider updated with LSP client');
-        }
-        
-        if (diagnosticProvider && typeof diagnosticProvider.setLSPClient === 'function') {
-            diagnosticProvider.setLSPClient(lspClient);
-            console.log('✅ Diagnostic Provider updated with LSP client');
-        }
-    } catch (err) {
-        console.warn('⚠️ Failed to update providers with LSP client:', err);
-    }
-}
+// updateProvidersWithLSP removed - all providers are LSP-only now
 
 /**
  * LSP provider'larını kayıt eder (LSP başarıyla başladığında çağrılır)
@@ -323,13 +255,42 @@ function registerLSPProviders(
     lspClient: LanguageClientType
 ): void {
     if (!SemanticProvider || !LanguageClient) {
-        console.warn('⚠️ LSP providers not available');
+        if (DEBUG) console.warn('LSP providers not available');
         return;
     }
 
     try {
-        // Semantic Provider oluştur (diğer provider'lar bunu kullanır)
+
+        // Semantic Provider oluştur (LSP server'dan semantic tokens alır)
         const semanticProvider = new SemanticProvider(lspClient);
+        
+        // Hover Provider - Sadece LSP kullanır
+        if (KipHoverProvider) {
+            const hoverProvider = vscode.languages.registerHoverProvider(
+                kipSelector,
+                new KipHoverProvider(lspClient)
+            );
+            context.subscriptions.push(hoverProvider);
+        }
+        
+        // Completion Provider
+        if (KipCompletionProvider) {
+            const completionProvider = vscode.languages.registerCompletionItemProvider(
+                kipSelector,
+                new KipCompletionProvider(lspClient),
+                '-', '\''
+            );
+            context.subscriptions.push(completionProvider);
+        }
+        
+        // Formatting Provider
+        if (KipFormattingProvider) {
+            const formattingProvider = vscode.languages.registerDocumentFormattingEditProvider(
+                kipSelector,
+                new KipFormattingProvider(lspClient)
+            );
+            context.subscriptions.push(formattingProvider);
+        }
 
         // Definition Provider
         if (KipDefinitionProvider) {
@@ -338,7 +299,6 @@ function registerLSPProviders(
                 new KipDefinitionProvider(lspClient, semanticProvider)
             );
             context.subscriptions.push(definitionProvider);
-            console.log('✅ Definition Provider registered');
         }
 
         // Reference Provider
@@ -348,7 +308,6 @@ function registerLSPProviders(
                 new KipReferenceProvider(lspClient, semanticProvider)
             );
             context.subscriptions.push(referenceProvider);
-            console.log('✅ Reference Provider registered');
         }
 
         // Document Highlight Provider
@@ -358,7 +317,6 @@ function registerLSPProviders(
                 new KipDocumentHighlightProvider(semanticProvider)
             );
             context.subscriptions.push(highlightProvider);
-            console.log('✅ Document Highlight Provider registered');
         }
 
         // Rename Provider
@@ -368,7 +326,6 @@ function registerLSPProviders(
                 new KipRenameProvider(lspClient, semanticProvider)
             );
             context.subscriptions.push(renameProvider);
-            console.log('✅ Rename Provider registered');
         }
 
         // Code Action Provider
@@ -385,10 +342,9 @@ function registerLSPProviders(
                 }
             );
             context.subscriptions.push(codeActionProvider);
-            console.log('✅ Code Action Provider registered');
         }
 
-        // Code Lens Provider (kip.enableCodeLens ayarına göre)
+        // Code Lens Provider
         if (KipCodeLensProvider) {
             const config = vscode.workspace.getConfiguration('kip');
             if (config.get<boolean>('enableCodeLens', true)) {
@@ -398,21 +354,19 @@ function registerLSPProviders(
                     codeLensProvider
                 );
                 context.subscriptions.push(codeLensDisposable);
-                console.log('✅ Code Lens Provider registered');
             }
         }
 
-        // Document Symbol Provider (Outline için)
+        // Document Symbol Provider
         if (KipSymbolProvider) {
             const symbolProvider = vscode.languages.registerDocumentSymbolProvider(
                 kipSelector,
                 new KipSymbolProvider(lspClient, semanticProvider)
             );
             context.subscriptions.push(symbolProvider);
-            console.log('✅ Document Symbol Provider registered');
         }
 
-        // Workspace Symbol Provider (Ctrl+T için)
+        // Workspace Symbol Provider
         if (KipWorkspaceSymbolProvider) {
             const config = vscode.workspace.getConfiguration('kip');
             if (config.get<boolean>('enableWorkspaceSymbols', true)) {
@@ -420,54 +374,55 @@ function registerLSPProviders(
                     new KipWorkspaceSymbolProvider(lspClient, semanticProvider)
                 );
                 context.subscriptions.push(workspaceSymbolProvider);
-                console.log('✅ Workspace Symbol Provider registered');
             }
         }
 
-        console.log('✅ All LSP providers registered successfully');
+        // Semantic Tokens Provider
+        if (KipSemanticTokensProvider) {
+            const semanticTokensProvider = new KipSemanticTokensProvider(semanticProvider);
+            const semanticTokensDisposable = vscode.languages.registerDocumentSemanticTokensProvider(
+                kipSelector,
+                semanticTokensProvider,
+                semanticTokensProvider.getLegend()
+            );
+            context.subscriptions.push(semanticTokensDisposable);
+        }
     } catch (err) {
-        console.error('❌ Error registering LSP providers:', err);
+        logError('Error registering LSP providers', err);
     }
 }
 
 function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.DocumentSelector): LanguageClientType | null {
+    log('initializeLSP called');
     const path = require('path');
     const fs = require('fs');
 
-    // Helper to find the server executable
-    const findServerPath = (): string => {
-        const bundledPath = context.asAbsolutePath(path.join('bin', 'kip-lsp'));
-        if (fs.existsSync(bundledPath)) {
-            try {
-                fs.chmodSync(bundledPath, '755');
-            } catch (e) {
-                console.error('Failed to chmod bundled binary:', e);
-            }
-            return bundledPath;
-        }
+    // Use our own TypeScript LSP server
+    const serverPath = context.asAbsolutePath(path.join('out', 'server', 'server.js'));
+    log(`Server path: ${serverPath}`);
 
-        const homeDir = process.env.HOME || process.env.USERPROFILE;
-        if (homeDir) {
-            const localBinPath = path.join(homeDir, '.local', 'bin', 'kip-lsp');
-            if (fs.existsSync(localBinPath)) {
-                return localBinPath;
-            }
-        }
-
-        return 'kip-lsp';
-    };
-
-    const serverPath = findServerPath();
-    const fsmPath = context.asAbsolutePath('trmorph.fst');
-
-    if (!TransportKind) {
+    // Check if server exists
+    if (!fs.existsSync(serverPath)) {
+        logError('LSP server not found', { path: serverPath });
         return null;
     }
 
+    if (!TransportKind) {
+        logError('TransportKind not available', null);
+        return null;
+    }
+
+    // Use Node.js to run our TypeScript LSP server
     const serverExecutable = {
-        command: serverPath,
-        args: ['--fsm', fsmPath],
-        transport: TransportKind.stdio
+        command: 'node',
+        args: [serverPath],
+        transport: TransportKind.stdio,
+        options: {
+            env: {
+                ...process.env,
+                NODE_ENV: process.env.NODE_ENV || 'production'
+            }
+        }
     };
 
     const serverOptions = {
@@ -475,55 +430,48 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         debug: serverExecutable
     };
 
-    // LSP options matching Haskell implementation (kip-lang/app/Lsp.hs lines 89-99)
-    // TextDocumentSyncOptions: Full sync, open/close enabled, save enabled
-    // Completion trigger characters: "-'" (matching Haskell line 98)
+    // LSP options for our TypeScript LSP server
     const clientOptions: any = {
         documentSelector: [{ scheme: 'file', language: 'kip' }],
         synchronize: {
-            // Full document sync (TextDocumentSyncKind_Full) - matching Haskell line 93
-            configurationSection: ['kip'],
-            fileEvents: [
-                vscode.workspace.createFileSystemWatcher('**/*.kip'),
-                vscode.workspace.createFileSystemWatcher('**/.clientrc')
-            ]
+            fileEvents: []
         },
-        // Completion trigger characters matching Haskell: "-'" (line 98)
-        initializationOptions: {
-            // Empty for now, matching Haskell's minimal initialization (doInitialize = \env _ -> pure (Right env))
-        }
+        initializationOptions: {},
+        outputChannel: outputChannel
     };
     
-    // Set trace to Off to minimize logging (matching Haskell's minimal logging approach)
-    try {
-        const TraceEnum = require('vscode-languageclient/node').Trace;
-        if (TraceEnum && TraceEnum.Off !== undefined) {
-            clientOptions.trace = TraceEnum.Off;
+    // Set trace level
+    if (DEBUG) {
+        try {
+            const TraceEnum = require('vscode-languageclient/node').Trace;
+            if (TraceEnum && TraceEnum.Verbose !== undefined) {
+                clientOptions.trace = TraceEnum.Verbose;
+            } else if (TraceEnum && TraceEnum.Messages !== undefined) {
+                clientOptions.trace = TraceEnum.Messages;
+            }
+        } catch (e) {
+            // Ignore trace setting errors
         }
-    } catch (e) {
-        // Trace enum not available, ignore
     }
 
     if (!LanguageClient) {
+        logError('LanguageClient not available', null);
         return null;
     }
 
-    const client = new LanguageClient(
-        'kipLanguageServer',
-        'Kip Language Server',
-        serverOptions,
-        clientOptions
-    );
-
-    // Start LSP asynchronously, don't block extension activation
-    client.start().then(() => {
-        console.log('✅ Kip LSP started successfully');
-    }).catch((err: unknown) => {
-        console.warn('⚠️ Kip LSP could not be started:', err);
-        console.log('ℹ️ Extension continues to work without LSP');
-    });
-
-    return client;
+    try {
+        const client = new LanguageClient(
+            'kipLanguageServer',
+            'Kip Language Server',
+            serverOptions,
+            clientOptions
+        );
+        log('LanguageClient instance created');
+        return client;
+    } catch (error) {
+        logError('Failed to create LanguageClient', error);
+        return null;
+    }
 }
 
 export function deactivate() {

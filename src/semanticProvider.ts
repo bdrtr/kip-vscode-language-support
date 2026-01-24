@@ -5,15 +5,16 @@ import { LanguageClient } from 'vscode-languageclient/node';
  * LSP'den gelen semantic bilgileri yönetir
  */
 export class SemanticProvider {
-    private client: LanguageClient;
+    private client: LanguageClient | null;
     private semanticCache: Map<string, vscode.SemanticTokens> = new Map();
 
-    constructor(client: LanguageClient) {
+    constructor(client: LanguageClient | null) {
         this.client = client;
     }
 
     /**
      * LSP'den semantic tokens alır
+     * Eğer LSP semantic tokens sağlamıyorsa, documentSymbol'lerden semantic tokens oluşturur
      */
     async getSemanticTokens(document: vscode.TextDocument): Promise<vscode.SemanticTokens | null> {
         const uri = document.uri.toString();
@@ -24,8 +25,15 @@ export class SemanticProvider {
             return cached;
         }
 
+        // LSP client'ın hazır olup olmadığını kontrol et
+        if (!this.client || !this.isClientReady()) {
+            // LSP henüz hazır değil - return null (LSP is required)
+            return null;
+        }
+
         try {
-            // LSP'den semantic tokens iste
+            // Önce LSP'den semantic tokens iste
+            if (!this.client) return null;
             const result = await this.client.sendRequest('textDocument/semanticTokens/full', {
                 textDocument: {
                     uri: document.uri.toString()
@@ -45,22 +53,28 @@ export class SemanticProvider {
                 }
             }
         } catch (error) {
-            // LSP sunucusu semantic tokens'ı desteklemiyor - bu normal, sessizce devam et
+            // LSP error - return null (LSP is required)
             const errorMsg = error instanceof Error ? error.message : String(error);
-            if (errorMsg.includes('no handler') || errorMsg.includes('not supported')) {
-                // LSP sunucusu semantic tokens'ı desteklemiyor - bu beklenen bir durum
-                // Sadece ilk seferde log et, sonra sessizce devam et
-                if (!this.semanticCache.has('_semanticTokensNotSupported')) {
-                    console.log('ℹ️ LSP server does not support semantic tokens, using fallback');
-                    this.semanticCache.set('_semanticTokensNotSupported', null as any);
-                }
-            } else {
-                // Beklenmeyen bir hata - log et
-                console.error('Error getting semantic tokens:', error);
-            }
+            console.warn('LSP semantic tokens request failed:', errorMsg);
         }
 
+        // LSP is required - no fallback
         return null;
+    }
+
+    /**
+     * LSP client'ın hazır olup olmadığını kontrol eder
+     */
+    private isClientReady(): boolean {
+        try {
+            // LanguageClient'ın state'ini kontrol et
+            const clientState = (this.client as any).state;
+            // State: 0 = Stopped, 1 = Starting, 2 = Running
+            return clientState === 2; // Running
+        } catch (e) {
+            // State kontrolü başarısız - varsayılan olarak hazır değil say
+            return false;
+        }
     }
 
     /**

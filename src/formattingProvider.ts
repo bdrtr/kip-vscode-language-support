@@ -8,12 +8,49 @@ interface FormattingOptions {
 export class KipFormattingProvider implements
     vscode.DocumentFormattingEditProvider,
     vscode.DocumentRangeFormattingEditProvider {
+    
+    private lspClient: any = null;
+    
+    constructor(lspClient?: any) {
+        this.lspClient = lspClient || null;
+    }
 
-    provideDocumentFormattingEdits(
+    async provideDocumentFormattingEdits(
         document: vscode.TextDocument,
         options: vscode.FormattingOptions,
         token: vscode.CancellationToken
-    ): vscode.TextEdit[] {
+    ): Promise<vscode.TextEdit[]> {
+        // Try LSP formatting first
+        if (this.lspClient && this.isClientReady()) {
+            try {
+                const result = await this.lspClient.sendRequest('textDocument/formatting', {
+                    textDocument: {
+                        uri: document.uri.toString()
+                    },
+                    options: {
+                        tabSize: options.tabSize,
+                        insertSpaces: options.insertSpaces
+                    }
+                }, token);
+                
+                if (result && Array.isArray(result) && result.length > 0) {
+                    return result.map((edit: any) => vscode.TextEdit.replace(
+                        new vscode.Range(
+                            edit.range.start.line,
+                            edit.range.start.character,
+                            edit.range.end.line,
+                            edit.range.end.character
+                        ),
+                        edit.newText
+                    ));
+                }
+            } catch (error) {
+                // LSP formatting failed - use fallback
+                console.warn('LSP formatting failed, using fallback:', error);
+            }
+        }
+        
+        // Fallback formatting
         const fullRange = new vscode.Range(
             document.positionAt(0),
             document.positionAt(document.getText().length)
@@ -25,6 +62,16 @@ export class KipFormattingProvider implements
         });
 
         return [vscode.TextEdit.replace(fullRange, formatted)];
+    }
+    
+    private isClientReady(): boolean {
+        if (!this.lspClient) return false;
+        try {
+            const clientState = (this.lspClient as any).state;
+            return clientState === 2; // Running
+        } catch (e) {
+            return false;
+        }
     }
 
     provideDocumentRangeFormattingEdits(
@@ -134,15 +181,18 @@ export class KipFormattingProvider implements
     }
 
     private cleanupBlankLines(text: string): string {
-        // Replace 3+ consecutive newlines with just 2 (one blank line)
-        let result = text.replace(/\n{3,}/g, '\n\n');
-
-        // Remove trailing whitespace from each line
-        result = result.split('\n').map(line => line.trimEnd()).join('\n');
-
-        // Ensure file ends with single newline
-        result = result.trimEnd() + '\n';
-
-        return result;
+        // Matching Haskell: formatText - trim trailing whitespace and ensure trailing newline
+        // (kip-lang/app/Lsp.hs lines 478-481)
+        const lines = text.split('\n');
+        
+        // Remove trailing whitespace from each line (matching Haskell: T.stripEnd)
+        const trimmed = lines.map(line => line.trimEnd()).join('\n');
+        
+        // Ensure file ends with single newline (matching Haskell: if T.null trimmed || T.last trimmed == '\n')
+        if (trimmed.length === 0 || trimmed[trimmed.length - 1] === '\n') {
+            return trimmed;
+        } else {
+            return trimmed + '\n';
+        }
     }
 }

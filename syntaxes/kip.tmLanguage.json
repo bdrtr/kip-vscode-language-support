@@ -11,27 +11,6 @@
         },
         {
             "include": "#numbers"
-        },
-        {
-            "include": "#type-definitions"
-        },
-        {
-            "include": "#data-constructors"
-        },
-        {
-            "include": "#function-signatures"
-        },
-        {
-            "include": "#keywords"
-        },
-        {
-            "include": "#constants"
-        },
-        {
-            "include": "#identifiers"
-        },
-        {
-            "include": "#case-suffixes"
         }
     ],
     "repository": {
@@ -68,51 +47,7 @@
             "patterns": [
                 {
                     "name": "constant.numeric.kip",
-                    "match": "\\b\\d+\\b"
-                }
-            ]
-        },
-        "keywords": {
-            "patterns": [
-                {
-                    "name": "keyword.control.kip",
-                    "match": "\\b(ya da|ya|olabilir|diyelim|olsun|Bir|var|yerleşik|olarak|ve|ile|ise|yoksa|için|kadar|diye|gibi)\\b"
-                },
-                {
-                    "name": "keyword.control.verb.kip",
-                    "match": "\\b(yazıp|yazmaktır|çalıştırmak|çalıştır|oku|okuyup|bitir|başla|dön|döndür)\\b"
-                },
-                {
-                    "name": "keyword.control.conditional.kip",
-                    "match": "(doğruysa|yanlışsa|değilse|yokluksa)"
-                }
-            ]
-        },
-        "identifiers": {
-            "patterns": [
-                {
-                    "name": "variable.other.kip",
-                    "match": "\\b[a-züöşğçıA-ZÜÖŞĞÇİ][a-züöşğçıA-ZÜÖŞĞÇİ\\-]*\\b"
-                }
-            ]
-        },
-        "constants": {
-            "patterns": [
-                {
-                    "name": "constant.language.boolean.kip",
-                    "match": "\\b(doğru|yanlış)\\b"
-                }
-            ]
-        },
-        "case-suffixes": {
-            "patterns": [
-                {
-                    "name": "keyword.operator.case.kip",
-                    "match": "[']([yYnNdD]?[aAeEıIiİuUüÜ])"
-                },
-                {
-                    "name": "keyword.operator.sequencing.kip",
-                    "match": "[ıiuü]p\\b"
+                    "match": "\\b\\d+(\\.\\d+)?\\b"
                 }
             ]
         }

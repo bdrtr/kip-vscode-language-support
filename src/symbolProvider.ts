@@ -18,45 +18,77 @@ export class KipSymbolProvider implements vscode.DocumentSymbolProvider {
         document: vscode.TextDocument,
         token: vscode.CancellationToken
     ): Promise<vscode.DocumentSymbol[]> {
+        // LSP client'ın hazır olup olmadığını kontrol et
+        if (!this.isClientReady()) {
+            console.log('LSP client not ready, using semantic tokens for document symbols');
+            return this.getFallbackSymbols(document);
+        }
+
         // Önce LSP'den document symbols iste
         try {
             const result = await this.client.sendRequest('textDocument/documentSymbol', {
                 textDocument: {
                     uri: document.uri.toString()
                 }
-            });
+            }, token);
 
             if (result && Array.isArray(result)) {
-                return result.map(sym => this.convertDocumentSymbol(sym));
+                if (result.length > 0) {
+                    return result.map(sym => this.convertDocumentSymbol(sym));
+                }
             }
         } catch (error) {
             // LSP document symbols yoksa, semantic tokens kullan
-            console.log('LSP document symbols not available, using semantic tokens');
-        }
-
-        // Fallback: Semantic tokens kullan
-        const symbols = await this.semanticProvider.extractSymbols(document);
-        
-        // Sadece function, type ve variable'ları döndür (outline için)
-        const documentSymbols: vscode.DocumentSymbol[] = [];
-        
-        for (const sym of symbols) {
-            if (sym.kind === vscode.SymbolKind.Function ||
-                sym.kind === vscode.SymbolKind.Class ||
-                sym.kind === vscode.SymbolKind.Variable) {
-                
-                documentSymbols.push(new vscode.DocumentSymbol(
-                    sym.name,
-                    sym.type,
-                    sym.kind,
-                    sym.range,
-                    sym.range
-                ));
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            if (errorMsg.includes('no handler') || errorMsg.includes('not supported')) {
+                console.log('LSP document symbols not supported by server, using semantic tokens');
+            } else {
+                console.warn('LSP document symbols request failed:', errorMsg);
             }
         }
 
-        // Hiyerarşik yapı oluştur (iç içe fonksiyonlar için)
-        return this.buildHierarchy(documentSymbols);
+        return this.getFallbackSymbols(document);
+    }
+
+    private isClientReady(): boolean {
+        try {
+            const clientState = (this.client as any).state;
+            return clientState === 2; // Running
+        } catch (e) {
+            return false;
+        }
+    }
+
+    private async getFallbackSymbols(document: vscode.TextDocument): Promise<vscode.DocumentSymbol[]> {
+
+        // Fallback: Semantic tokens kullan
+        try {
+            const symbols = await this.semanticProvider.extractSymbols(document);
+            
+            // Sadece function, type ve variable'ları döndür (outline için)
+            const documentSymbols: vscode.DocumentSymbol[] = [];
+            
+            for (const sym of symbols) {
+                if (sym.kind === vscode.SymbolKind.Function ||
+                    sym.kind === vscode.SymbolKind.Class ||
+                    sym.kind === vscode.SymbolKind.Variable) {
+                    
+                    documentSymbols.push(new vscode.DocumentSymbol(
+                        sym.name,
+                        sym.type,
+                        sym.kind,
+                        sym.range,
+                        sym.range
+                    ));
+                }
+            }
+
+            // Hiyerarşik yapı oluştur (iç içe fonksiyonlar için)
+            return this.buildHierarchy(documentSymbols);
+        } catch (error) {
+            console.warn('Failed to extract symbols for document symbols:', error);
+            return [];
+        }
     }
 
     private convertDocumentSymbol(sym: any): vscode.DocumentSymbol {

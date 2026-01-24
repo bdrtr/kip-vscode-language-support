@@ -28,7 +28,7 @@
         "functional"
     ],
     "activationEvents": [
-        "onStartupFinished"
+        "onLanguage:kip"
     ],
     "contributes": {
         "languages": [
@@ -46,13 +46,6 @@
                     "light": "./images/icon.png",
                     "dark": "./images/icon.png"
                 }
-            }
-        ],
-        "grammars": [
-            {
-                "language": "kip",
-                "scopeName": "source.kip",
-                "path": "./syntaxes/kip.tmLanguage.json"
             }
         ],
         "snippets": [
@@ -146,6 +139,9 @@
         ]
     },
     "main": "./out/extension.js",
+    "activationEvents": [
+        "onLanguage:kip"
+    ],
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
@@ -153,6 +149,8 @@
         "lint": "eslint src --ext ts",
         "check": "node scripts/check-dependencies.js",
         "test": "node scripts/test-extension.js",
+        "test:comprehensive": "node scripts/comprehensive-test.js",
+        "test:all": "npm run test && npm run test:comprehensive",
         "validate": "node scripts/validate-vsix.js",
         "quick-check": "bash scripts/quick-check.sh",
         "package": "npm run compile && vsce package",
@@ -164,7 +162,9 @@
     "dependencies": {
         "balanced-match": "^3.0.1",
         "semver": "^7.7.3",
-        "vscode-languageclient": "^9.0.1"
+        "vscode-languageclient": "^9.0.1",
+        "vscode-languageserver": "^9.0.1",
+        "vscode-languageserver-textdocument": "^1.0.12"
     },
     "devDependencies": {
         "@types/node": "^20.19.30",

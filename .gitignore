@@ -28,3 +28,8 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+
+# Test files
+test-example.kip
+TEST_REPORT.md
+*.test.kip
