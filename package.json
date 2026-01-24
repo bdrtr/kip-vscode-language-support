@@ -106,8 +106,7 @@
                     "default": false,
                     "description": "Kaydetme sırasında otomatik formatla",
                     "scope": "resource"
-                }
-,
+                },
                 "[kip]": {
                     "type": "object",
                     "default": {
