@@ -101,24 +101,13 @@
                     "description": "Kip LSP sunucusunun tam yolu (boş bırakılırsa otomatik bulunur)",
                     "scope": "machine"
                 },
-                "kip.enableCodeLens": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Referans sayısını gösteren Code Lens'i etkinleştir",
-                    "scope": "resource"
-                },
                 "kip.formatOnSave": {
                     "type": "boolean",
                     "default": false,
                     "description": "Kaydetme sırasında otomatik formatla",
                     "scope": "resource"
-                },
-                "kip.enableWorkspaceSymbols": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Workspace sembol aramasını etkinleştir (Ctrl+T)",
-                    "scope": "resource"
-                },
+                }
+,
                 "[kip]": {
                     "type": "object",
                     "default": {

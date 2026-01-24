@@ -1,17 +1,15 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import { SemanticProvider } from './semanticProvider';
 
 /**
- * LSP semantic bilgilerini kullanarak references sağlar
+ * LSP kullanarak references sağlar
+ * Note: kip-lsp may not support textDocument/references, returns empty if not available
  */
 export class KipReferenceProvider implements vscode.ReferenceProvider {
     private client: LanguageClient;
-    private semanticProvider: SemanticProvider;
 
-    constructor(client: LanguageClient, semanticProvider: SemanticProvider) {
+    constructor(client: LanguageClient) {
         this.client = client;
-        this.semanticProvider = semanticProvider;
     }
 
     async provideReferences(
@@ -20,7 +18,7 @@ export class KipReferenceProvider implements vscode.ReferenceProvider {
         context: vscode.ReferenceContext,
         token: vscode.CancellationToken
     ): Promise<vscode.Location[] | undefined> {
-        // Önce LSP'den references iste
+        // kip-lsp may not support textDocument/references
         try {
             const result = await this.client.sendRequest('textDocument/references', {
                 textDocument: {
@@ -45,48 +43,20 @@ export class KipReferenceProvider implements vscode.ReferenceProvider {
                 ));
             }
         } catch (error) {
-            // LSP references yoksa, semantic tokens kullan
-            console.log('LSP references not available, using semantic tokens');
-        }
-
-        // Fallback: Semantic tokens kullan
-        const symbol = await this.semanticProvider.findSymbolAtPosition(document, position);
-        if (!symbol) {
+            // kip-lsp doesn't support this
             return [];
         }
 
-        // Tüm dosyada aynı isimdeki sembolleri bul
-        const allSymbols = await this.semanticProvider.findSymbolsByName(document, symbol.name);
-        
-        // Declaration'ı filtrele
-        let references = allSymbols.map(s => new vscode.Location(document.uri, s.range));
-        
-        if (!context.includeDeclaration) {
-            // Declaration'ı çıkar (ilk function/type/class olanı)
-            const declaration = allSymbols.find(s => 
-                s.kind === vscode.SymbolKind.Function || 
-                s.kind === vscode.SymbolKind.Class
-            );
-            
-            if (declaration) {
-                references = references.filter(ref => 
-                    !ref.range.isEqual(declaration.range)
-                );
-            }
-        }
-
-        return references;
+        return [];
     }
 }
 
 /**
- * LSP semantic bilgilerini kullanarak document highlight sağlar
+ * Document highlight provider - kip-lsp doesn't support this, returns empty
  */
 export class KipDocumentHighlightProvider implements vscode.DocumentHighlightProvider {
-    private semanticProvider: SemanticProvider;
-
-    constructor(semanticProvider: SemanticProvider) {
-        this.semanticProvider = semanticProvider;
+    constructor() {
+        // No semantic provider needed - kip-lsp doesn't support document highlights
     }
 
     async provideDocumentHighlights(
@@ -94,17 +64,7 @@ export class KipDocumentHighlightProvider implements vscode.DocumentHighlightPro
         position: vscode.Position,
         token: vscode.CancellationToken
     ): Promise<vscode.DocumentHighlight[] | undefined> {
-        const symbol = await this.semanticProvider.findSymbolAtPosition(document, position);
-        if (!symbol) {
-            return [];
-        }
-
-        // Tüm dosyada aynı isimdeki sembolleri bul
-        const allSymbols = await this.semanticProvider.findSymbolsByName(document, symbol.name);
-        
-        return allSymbols.map(s => new vscode.DocumentHighlight(
-            s.range,
-            vscode.DocumentHighlightKind.Read
-        ));
+        // kip-lsp doesn't support document highlights
+        return [];
     }
 }

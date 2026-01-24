@@ -1,17 +1,15 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import { SemanticProvider } from './semanticProvider';
 
 /**
  * LSP diagnostic'lerinden code actions türetir
+ * Note: kip-lsp may not support textDocument/codeAction, derives from diagnostics
  */
 export class KipCodeActionProvider implements vscode.CodeActionProvider {
     private client: LanguageClient;
-    private semanticProvider: SemanticProvider;
 
-    constructor(client: LanguageClient, semanticProvider: SemanticProvider) {
+    constructor(client: LanguageClient) {
         this.client = client;
-        this.semanticProvider = semanticProvider;
     }
 
     async provideCodeActions(
@@ -99,19 +97,17 @@ export class KipCodeActionProvider implements vscode.CodeActionProvider {
 
         // Tanımsız değişken/fonksiyon hatası
         if (message.includes('tanımsız') || message.includes('undefined') || message.includes('bulunamadı')) {
-            const symbol = await this.semanticProvider.findSymbolAtPosition(
-                document,
-                diagnostic.range.start
-            );
-
-            if (symbol) {
+            // Extract symbol name from diagnostic message or range
+            const symbolName = this.extractSymbolName(document, diagnostic.range);
+            
+            if (symbolName) {
                 // Eksik tanım ekle action'ı
                 const action = new vscode.CodeAction(
-                    `"${symbol.name}" için tanım ekle`,
+                    `"${symbolName}" için tanım ekle`,
                     vscode.CodeActionKind.QuickFix
                 );
                 action.diagnostics = [diagnostic];
-                action.edit = await this.createDefinitionEdit(document, symbol);
+                action.edit = this.createDefinitionEdit(document, symbolName);
                 actions.push(action);
             }
         }
@@ -130,27 +126,26 @@ export class KipCodeActionProvider implements vscode.CodeActionProvider {
         return actions;
     }
 
-    private async createDefinitionEdit(
+    private extractSymbolName(document: vscode.TextDocument, range: vscode.Range): string | null {
+        // Extract symbol name from document at range
+        const text = document.getText(range);
+        if (text && text.trim().length > 0) {
+            return text.trim();
+        }
+        return null;
+    }
+
+    private createDefinitionEdit(
         document: vscode.TextDocument,
-        symbol: { name: string; kind: vscode.SymbolKind; range: vscode.Range; type: string }
-    ): Promise<vscode.WorkspaceEdit> {
+        symbolName: string
+    ): vscode.WorkspaceEdit {
         const edit = new vscode.WorkspaceEdit();
         const insertPosition = new vscode.Position(0, 0);
 
-        // Semantic bilgilerine göre uygun template oluştur
-        let template = '';
-        if (symbol.kind === vscode.SymbolKind.Function) {
-            template = `(bu tip) ${symbol.name},\n  durmaktır.\n\n`;
-        } else if (symbol.kind === vscode.SymbolKind.Variable) {
-            template = `0'a ${symbol.name} diyelim.\n\n`;
-        } else if (symbol.kind === vscode.SymbolKind.Class) {
-            template = `Bir ${symbol.name} ya değer olabilir.\n\n`;
-        }
+        // Simple template - assume function
+        const template = `(bu tip) ${symbolName},\n  durmaktır.\n\n`;
 
-        if (template) {
-            edit.insert(document.uri, insertPosition, template);
-        }
-
+        edit.insert(document.uri, insertPosition, template);
         return edit;
     }
 

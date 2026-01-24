@@ -1,17 +1,15 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import { SemanticProvider } from './semanticProvider';
 
 /**
- * LSP semantic bilgilerini kullanarak rename sağlar
+ * LSP kullanarak rename sağlar
+ * Note: kip-lsp may not support textDocument/rename, throws error if not available
  */
 export class KipRenameProvider implements vscode.RenameProvider {
     private client: LanguageClient;
-    private semanticProvider: SemanticProvider;
 
-    constructor(client: LanguageClient, semanticProvider: SemanticProvider) {
+    constructor(client: LanguageClient) {
         this.client = client;
-        this.semanticProvider = semanticProvider;
     }
 
     async provideRenameEdits(
@@ -61,29 +59,11 @@ export class KipRenameProvider implements vscode.RenameProvider {
                 return edit;
             }
         } catch (error) {
-            // LSP rename yoksa, semantic tokens kullan
-            console.log('LSP rename not available, using semantic tokens');
+            // kip-lsp doesn't support rename
+            throw new Error('Yeniden adlandırma desteklenmiyor. kip-lsp bu özelliği desteklemiyor.');
         }
 
-        // Fallback: Semantic tokens kullan
-        const symbol = await this.semanticProvider.findSymbolAtPosition(document, position);
-        if (!symbol) {
-            throw new Error('Yeniden adlandırılabilir bir sembol bulunamadı.');
-        }
-
-        const workspaceEdit = new vscode.WorkspaceEdit();
-        
-        // Tüm referansları bul
-        const allSymbols = await this.semanticProvider.findSymbolsByName(document, symbol.name);
-        
-        // Her referansı yeni isimle değiştir (hal eklerini koru)
-        for (const sym of allSymbols) {
-            const oldText = document.getText(sym.range);
-            const newText = this.preserveCaseSuffix(oldText, newName);
-            workspaceEdit.replace(document.uri, sym.range, newText);
-        }
-
-        return workspaceEdit;
+        throw new Error('Yeniden adlandırma başarısız oldu.');
     }
 
     async prepareRename(
@@ -116,21 +96,11 @@ export class KipRenameProvider implements vscode.RenameProvider {
                 }
             }
         } catch (error) {
-            // LSP prepareRename yoksa, semantic tokens kullan
+            // kip-lsp doesn't support prepareRename
+            return null;
         }
 
-        // Fallback: Semantic tokens kullan
-        const symbol = await this.semanticProvider.findSymbolAtPosition(document, position);
-        if (!symbol) {
-            throw new Error('Yeniden adlandırılabilir bir sembol bulunamadı.');
-        }
-
-        const baseWord = this.stripCaseSuffixes(symbol.name);
-        
-        return {
-            range: symbol.range,
-            placeholder: baseWord
-        };
+        return null;
     }
 
     private isValidIdentifier(name: string): boolean {
