@@ -1,45 +1,126 @@
 import * as vscode from 'vscode';
 import { builtinDocs, categoryInfo } from './data/builtins';
+import type { LanguageClient } from 'vscode-languageclient/node';
 
+/**
+ * Completion provider - combines builtin completions with LSP completions
+ * Matching Haskell LSP pattern: parser state (ctxIdents, typeNames, funcNames) + builtins
+ */
 export class KipCompletionProvider implements vscode.CompletionItemProvider {
-    provideCompletionItems(
+    private lspClient: LanguageClient | null = null;
+
+    constructor(lspClient?: LanguageClient | null) {
+        this.lspClient = lspClient || null;
+    }
+
+    async provideCompletionItems(
         document: vscode.TextDocument,
         position: vscode.Position,
         token: vscode.CancellationToken,
         context: vscode.CompletionContext
-    ): vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList> {
+    ): Promise<vscode.CompletionItem[] | vscode.CompletionList> {
         const completionItems: vscode.CompletionItem[] = [];
 
-        // Tüm yerleşik fonksiyonlar ve anahtar kelimeler için completion items oluştur
-        for (const [name, doc] of Object.entries(builtinDocs)) {
-            const item = new vscode.CompletionItem(name, this.getCompletionKind(doc.category));
+        // First, try to get LSP completions (matching Haskell: parser state from DocState)
+        if (this.lspClient) {
+            try {
+                const lspCompletions = await this.lspClient.sendRequest('textDocument/completion', {
+                    textDocument: {
+                        uri: document.uri.toString()
+                    },
+                    position: {
+                        line: position.line,
+                        character: position.character
+                    }
+                }, token);
 
-            // Detaylı bilgi
-            item.detail = doc.signature;
-
-            // Dokümantasyon
-            const markdown = new vscode.MarkdownString();
-            const catInfo = categoryInfo[doc.category];
-            markdown.appendMarkdown(`${catInfo.icon} **${catInfo.label}**\n\n`);
-            markdown.appendMarkdown(`${doc.description}\n\n`);
-            markdown.appendMarkdown(`**Örnek:**\n\`\`\`kip\n${doc.example}\n\`\`\``);
-            item.documentation = markdown;
-
-            // Öncelik - kategori bazlı
-            item.sortText = this.getSortText(doc.category, name);
-
-            // Insert text - bazı özel durumlar için
-            if (name === 'ya da') {
-                item.insertText = 'ya da';
+                if (lspCompletions && Array.isArray(lspCompletions)) {
+                    // Convert LSP completions to VS Code format
+                    for (const item of lspCompletions) {
+                        const vscodeItem = this.convertLSPCompletion(item);
+                        if (vscodeItem) {
+                            completionItems.push(vscodeItem);
+                        }
+                    }
+                }
+            } catch (error) {
+                // LSP completion not available, continue with builtins
+                console.log('LSP completion not available, using builtins');
             }
+        }
 
-            completionItems.push(item);
+        // Add builtin completions (always available, matching Haskell's builtin knowledge)
+        for (const [name, doc] of Object.entries(builtinDocs)) {
+            // Check if already added by LSP
+            if (!completionItems.find(item => item.label === name)) {
+                const item = new vscode.CompletionItem(name, this.getCompletionKind(doc.category));
+
+                // Detaylı bilgi
+                item.detail = doc.signature;
+
+                // Dokümantasyon
+                const markdown = new vscode.MarkdownString();
+                const catInfo = categoryInfo[doc.category];
+                markdown.appendMarkdown(`${catInfo.icon} **${catInfo.label}**\n\n`);
+                markdown.appendMarkdown(`${doc.description}\n\n`);
+                markdown.appendMarkdown(`**Örnek:**\n\`\`\`kip\n${doc.example}\n\`\`\``);
+                item.documentation = markdown;
+
+                // Öncelik - kategori bazlı
+                item.sortText = this.getSortText(doc.category, name);
+
+                // Insert text - bazı özel durumlar için
+                if (name === 'ya da') {
+                    item.insertText = 'ya da';
+                }
+
+                completionItems.push(item);
+            }
         }
 
         // Snippet'lerden bazı özel completion items ekle
         this.addSnippetCompletions(completionItems);
 
         return completionItems;
+    }
+
+    private convertLSPCompletion(item: any): vscode.CompletionItem | null {
+        if (!item || !item.label) {
+            return null;
+        }
+
+        const vscodeItem = new vscode.CompletionItem(
+            item.label,
+            this.mapLSPKindToVSCodeKind(item.kind)
+        );
+
+        if (item.detail) {
+            vscodeItem.detail = item.detail;
+        }
+
+        if (item.documentation) {
+            if (typeof item.documentation === 'string') {
+                vscodeItem.documentation = new vscode.MarkdownString(item.documentation);
+            } else if (item.documentation.value) {
+                vscodeItem.documentation = new vscode.MarkdownString(item.documentation.value);
+            }
+        }
+
+        if (item.insertText) {
+            vscodeItem.insertText = item.insertText;
+        }
+
+        if (item.sortText) {
+            vscodeItem.sortText = item.sortText;
+        }
+
+        return vscodeItem;
+    }
+
+    private mapLSPKindToVSCodeKind(kind?: number): vscode.CompletionItemKind {
+        // Map LSP CompletionItemKind to VS Code CompletionItemKind
+        // Default to Variable (matching Haskell: CompletionItemKind_Variable)
+        return vscode.CompletionItemKind.Variable;
     }
 
     private getCompletionKind(category: string): vscode.CompletionItemKind {

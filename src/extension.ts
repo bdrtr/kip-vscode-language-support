@@ -157,22 +157,31 @@ export function activate(context: vscode.ExtensionContext) {
     // FAZ 2: Temel Özellikler (LSP Olmadan)
     // ============================================
     
-    // Hover Provider - Builtin dokümantasyon
+    // Hover Provider - Builtin dokümantasyon (LSP hover will be added when LSP is ready)
+    // Matching Haskell: onHover uses inferType from expression at position
+    const hoverProviderInstance = new KipHoverProvider();
     const hoverProvider = vscode.languages.registerHoverProvider(
         kipSelector,
-        new KipHoverProvider()
+        hoverProviderInstance
     );
     context.subscriptions.push(hoverProvider);
     console.log('✅ Hover Provider registered');
 
-    // Completion Provider - Builtin öneriler
+    // Completion Provider - Builtin öneriler (LSP completion will be added when LSP is ready)
+    // Matching Haskell: onCompletion uses parser state (ctxIdents, typeNames, funcNames)
+    // Haskell'de completion trigger characters: "-'" (Lsp.hs line 98)
+    const completionProviderInstance = new KipCompletionProvider();
     const completionProvider = vscode.languages.registerCompletionItemProvider(
         kipSelector,
-        new KipCompletionProvider(),
-        '.', '\'', ' '
+        completionProviderInstance,
+        '-', '\'' // Matching Haskell: optCompletionTriggerCharacters = Just "-'"
     );
     context.subscriptions.push(completionProvider);
     console.log('✅ Completion Provider registered');
+    
+    // Store provider instances for LSP client injection (global scope)
+    (global as any)._kipHoverProvider = hoverProviderInstance;
+    (global as any)._kipCompletionProvider = completionProviderInstance;
 
     // Formatting Provider
     const formattingProvider = vscode.languages.registerDocumentFormattingEditProvider(
@@ -208,6 +217,10 @@ export function activate(context: vscode.ExtensionContext) {
                     lspWorking = true;
                     console.log('✅ LSP is ready and working');
                     
+                    // Update completion and hover providers with LSP client
+                    // (Matching Haskell: LSP provides completions from parser state and hover from type inference)
+                    updateProvidersWithLSP(lspClient!);
+                    
                     // LSP provider'larını kayıt et
                     registerLSPProviders(context, kipSelector, lspClient!);
                 }).catch((err) => {
@@ -223,10 +236,14 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     // ============================================
-    // FAZ 3.5: Fallback Diagnostics (LSP yoksa)
+    // FAZ 3.5: Diagnostics (LSP + Fallback)
     // ============================================
-    const diagnosticProvider = new KipDiagnosticProvider();
+    // Matching Haskell: parse errors + type check errors (analyzeDocument)
+    const diagnosticProvider = new KipDiagnosticProvider(); // LSP client will be set when available
     context.subscriptions.push(diagnosticProvider);
+    
+    // Store diagnostic provider for LSP client injection
+    (global as any)._kipDiagnosticProvider = diagnosticProvider;
 
     // Aktif belgeyi hemen kontrol et
     if (vscode.window.activeTextEditor?.document.languageId === 'kip') {
@@ -265,6 +282,36 @@ export function activate(context: vscode.ExtensionContext) {
     // Bu özellikler LSP olmadan da çalışabilir (basit versiyonları)
     // LSP başarılı olduğunda registerLSPProviders fonksiyonu çağrılacak
     console.log('✅ Extension activation completed successfully');
+}
+
+/**
+ * Update builtin providers with LSP client (matching Haskell pattern)
+ */
+function updateProvidersWithLSP(lspClient: LanguageClientType): void {
+    // Update hover, completion, and diagnostic providers with LSP client
+    // This allows them to combine builtin + LSP results (matching Haskell's pattern)
+    try {
+        const hoverProvider = (global as any)._kipHoverProvider as any;
+        const completionProvider = (global as any)._kipCompletionProvider as any;
+        const diagnosticProvider = (global as any)._kipDiagnosticProvider as any;
+        
+        if (hoverProvider && typeof hoverProvider.lspClient !== 'undefined') {
+            hoverProvider.lspClient = lspClient;
+            console.log('✅ Hover Provider updated with LSP client');
+        }
+        
+        if (completionProvider && typeof completionProvider.lspClient !== 'undefined') {
+            completionProvider.lspClient = lspClient;
+            console.log('✅ Completion Provider updated with LSP client');
+        }
+        
+        if (diagnosticProvider && typeof diagnosticProvider.setLSPClient === 'function') {
+            diagnosticProvider.setLSPClient(lspClient);
+            console.log('✅ Diagnostic Provider updated with LSP client');
+        }
+    } catch (err) {
+        console.warn('⚠️ Failed to update providers with LSP client:', err);
+    }
 }
 
 /**
@@ -428,12 +475,34 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         debug: serverExecutable
     };
 
-    const clientOptions = {
+    // LSP options matching Haskell implementation (kip-lang/app/Lsp.hs lines 89-99)
+    // TextDocumentSyncOptions: Full sync, open/close enabled, save enabled
+    // Completion trigger characters: "-'" (matching Haskell line 98)
+    const clientOptions: any = {
         documentSelector: [{ scheme: 'file', language: 'kip' }],
         synchronize: {
-            fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
+            // Full document sync (TextDocumentSyncKind_Full) - matching Haskell line 93
+            configurationSection: ['kip'],
+            fileEvents: [
+                vscode.workspace.createFileSystemWatcher('**/*.kip'),
+                vscode.workspace.createFileSystemWatcher('**/.clientrc')
+            ]
+        },
+        // Completion trigger characters matching Haskell: "-'" (line 98)
+        initializationOptions: {
+            // Empty for now, matching Haskell's minimal initialization (doInitialize = \env _ -> pure (Right env))
         }
     };
+    
+    // Set trace to Off to minimize logging (matching Haskell's minimal logging approach)
+    try {
+        const TraceEnum = require('vscode-languageclient/node').Trace;
+        if (TraceEnum && TraceEnum.Off !== undefined) {
+            clientOptions.trace = TraceEnum.Off;
+        }
+    } catch (e) {
+        // Trace enum not available, ignore
+    }
 
     if (!LanguageClient) {
         return null;
