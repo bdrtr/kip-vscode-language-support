@@ -1,15 +1,15 @@
-name: Build and Release Extension
+name: Build Extension
 
 on:
   push:
+    branches: [ main, master ]
+  pull_request:
     branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     
     steps:
     - name: Checkout code
@@ -30,35 +30,12 @@ jobs:
     - name: Install vsce
       run: npm install -g @vscode/vsce
       
-    - name: Get version from package.json
-      id: version
-      run: |
-        VERSION=$(node -p "require('./package.json').version")
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "VSIX version: $VERSION"
-      
     - name: Package extension
-      run: |
-        vsce package --out "kip-language-${{ steps.version.outputs.version }}.vsix"
-        echo "VSIX created: kip-language-${{ steps.version.outputs.version }}.vsix"
+      run: npm run package
       
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
       with:
-        name: kip-language-${{ steps.version.outputs.version }}
+        name: kip-language-extension
         path: '*.vsix'
-        retention-days: 90
-    
-    - name: Create or Update Release
-      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-      uses: softprops/action-gh-release@v1
-      with:
-        files: '*.vsix'
-        tag_name: v${{ steps.version.outputs.version }}
-        name: Kip Language Extension v${{ steps.version.outputs.version }}
-        generate_release_notes: true
-        draft: false
-        prerelease: false
-        fail_on_unmatched_files: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        retention-days: 7
