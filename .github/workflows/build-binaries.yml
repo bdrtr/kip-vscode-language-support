@@ -120,7 +120,7 @@ jobs:
         run: |
           if [ -n "${{ github.event.inputs.release_tag }}" ]; then
             VERSION="${{ github.event.inputs.release_tag }}"
-          elif startsWith("${{ github.ref }}", "refs/tags/v"); then
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
             VERSION="v${VERSION}"
           else
