@@ -34,3 +34,7 @@ test-example.kip
 TEST_REPORT.md
 *.test.kip
 test-lsp-detailed.kip
+
+# Compiled JavaScript (should not be committed)
+out/**/*.js
+out/**/*.js.map
