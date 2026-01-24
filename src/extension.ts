@@ -337,6 +337,27 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         transport: TransportKind.stdio
     };
 
+    const clientOptions = {
+        documentSelector: [{ scheme: 'file', language: 'kip' }],
+        synchronize: {
+            fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
+        },
+        errorHandler: {
+            error: (error: Error, message: any, count: number) => {
+                // Ignore "no handler" errors for optional LSP methods
+                if (error.message && (
+                    error.message.includes('no handler for') ||
+                    error.message.includes('SetTrace') ||
+                    error.message.includes('Initialized')
+                )) {
+                    return { action: 'continue' as const };
+                }
+                return { action: 'continue' as const };
+            },
+            closed: () => ({ action: 'restart' as const })
+        }
+    };
+
     const client = new LanguageClient(
         'kipLanguageServer',
         'Kip Language Server',
@@ -344,26 +365,7 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
             run: serverExecutable,
             debug: serverExecutable
         },
-        {
-            documentSelector: [{ scheme: 'file', language: 'kip' }],
-            synchronize: {
-                fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
-            },
-            errorHandler: {
-                error: (error, message, count) => {
-                    // Ignore "no handler" errors for optional LSP methods
-                    if (error.message && (
-                        error.message.includes('no handler for') ||
-                        error.message.includes('SetTrace') ||
-                        error.message.includes('Initialized')
-                    )) {
-                        return { action: 'continue' as const };
-                    }
-                    return { action: 'continue' as const };
-                },
-                closed: () => ({ action: 'restart' as const })
-            }
-        }
+        clientOptions
     );
 
     return client;
