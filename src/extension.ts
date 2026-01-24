@@ -249,6 +249,15 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             }, 100);
             
+            // Handle configuration changes (matching onConfigurationChange in Haskell)
+            const configWatcher = vscode.workspace.onDidChangeConfiguration((e) => {
+                if (e.affectsConfiguration('kip')) {
+                    // Configuration changed, but kip-lsp doesn't need special handling
+                    // (Haskell: onConfigurationChange = \cfg _ -> Right cfg)
+                }
+            });
+            context.subscriptions.push(configWatcher);
+            
             lspClient.start().then(() => {
                 registerLSPProviders(context, kipSelector, lspClient!);
             }).catch((err) => {
@@ -461,16 +470,42 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         }
     };
 
+    // LSP options matching Haskell implementation
+    // Based on kip-lang/app/Lsp.hs lspOptions
     const clientOptions: any = {
         documentSelector: [{ scheme: 'file', language: 'kip' }],
+        // TextDocumentSyncOptions matching Haskell: Full sync, open/close enabled, save enabled
         synchronize: {
-            fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
+            // Full document sync (TextDocumentSyncKind_Full)
+            configurationSection: ['kip'],
+            fileEvents: [
+                vscode.workspace.createFileSystemWatcher('**/*.kip'),
+                vscode.workspace.createFileSystemWatcher('**/.clientrc')
+            ]
         },
         outputChannel: lspOutputChannel,
-        traceOutputChannel: traceOutputChannel
+        traceOutputChannel: traceOutputChannel,
+        // Completion trigger characters matching Haskell: "-'"
+        initializationOptions: {
+            // Pass any initialization options if needed
+        },
+        // Use middleware to prevent sending unsupported notifications
+        // kip-lsp doesn't implement SMethod_Initialized and SMethod_SetTrace handlers
+        middleware: {
+            sendNotification: (type: any, params: any, next: any) => {
+                const method = type?.method || type;
+                const methodStr = String(method).toLowerCase();
+                // Don't send initialized or setTrace notifications that kip-lsp doesn't handle
+                // These are optional in LSP spec but vscode-languageclient sends them automatically
+                if (methodStr === 'initialized' || methodStr.includes('settrace')) {
+                    return Promise.resolve();
+                }
+                return next(type, params);
+            }
+        }
     };
     
-    // Try to set trace to Off if available
+    // Set trace to Off to minimize logging (matching Haskell's minimal logging approach)
     try {
         const TraceEnum = require('vscode-languageclient/node').Trace;
         if (TraceEnum && TraceEnum.Off !== undefined) {
@@ -506,11 +541,12 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         clientOptions
     );
     
-    // Additional filtering: intercept client's internal logging and connection
+    // Additional connection interception for unsupported notifications
+    // This is a fallback in case middleware doesn't catch everything
     try {
         const clientAny = client as any;
         
-        // Override tracer log methods
+        // Override tracer log methods to filter "no handler" messages
         if (clientAny._tracer) {
             const originalLog = clientAny._tracer.log;
             if (originalLog) {
@@ -522,56 +558,41 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
             }
         }
         
-        // Intercept connection to prevent sending SetTrace and Initialized notifications
-        if (clientAny._connection) {
-            const connection = clientAny._connection;
-            
-            // Override sendNotification to prevent sending problematic notifications
-            if (connection.sendNotification && typeof connection.sendNotification === 'function') {
-                const originalSendNotification = connection.sendNotification.bind(connection);
-                connection.sendNotification = function(method: string, params?: any) {
-                    // Don't send SetTrace or Initialized notifications that cause "no handler" errors
-                    const methodLower = String(method).toLowerCase();
-                    if (methodLower.includes('settrace') || methodLower === 'initialized') {
-                        return Promise.resolve();
-                    }
-                    try {
-                        return originalSendNotification(method, params);
-                    } catch (e) {
-                        // Ignore errors for filtered methods
-                        if (!shouldFilterMessage(String(e))) {
-                            throw e;
+        // Intercept connection after client is created (fallback for middleware)
+        const interceptConnection = () => {
+            try {
+                const connection = clientAny._connection || clientAny._messageConnection;
+                if (connection && connection.sendNotification && typeof connection.sendNotification === 'function') {
+                    const originalSend = connection.sendNotification.bind(connection);
+                    connection.sendNotification = function(method: string, params?: any) {
+                        const methodStr = String(method).toLowerCase();
+                        // Don't send unsupported notifications (matching Haskell's handler list)
+                        if (methodStr === 'initialized' || methodStr.includes('settrace')) {
+                            return Promise.resolve();
                         }
-                        return Promise.resolve();
-                    }
-                };
+                        return originalSend(method, params);
+                    };
+                }
+            } catch (e) {
+                // Ignore interception errors
             }
-        }
+        };
         
-        // Also intercept after client starts
+        // Try to intercept immediately and after delays
+        interceptConnection();
+        setTimeout(interceptConnection, 50);
+        setTimeout(interceptConnection, 200);
+        
+        // Override start to ensure interception after initialization
         const originalStart = client.start.bind(client);
         client.start = function() {
             return originalStart().then(() => {
-                // Additional interception after start
-                try {
-                    if (clientAny._connection && clientAny._connection.sendNotification) {
-                        const connection = clientAny._connection;
-                        const originalSend = connection.sendNotification.bind(connection);
-                        connection.sendNotification = function(method: string, params?: any) {
-                            const methodLower = String(method).toLowerCase();
-                            if (methodLower.includes('settrace') || methodLower === 'initialized') {
-                                return Promise.resolve();
-                            }
-                            return originalSend(method, params);
-                        };
-                    }
-                } catch (e) {
-                    // Ignore
-                }
+                interceptConnection();
+                return Promise.resolve();
             });
         };
     } catch (e) {
-        // Ignore errors
+        // Ignore errors in connection interception
     }
 
     return client;

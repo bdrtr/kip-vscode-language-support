@@ -62,6 +62,12 @@
                 "path": "./snippets/kip.json"
             }
         ],
+        "configurationDefaults": {
+            "[kip]": {
+                "editor.defaultFormatter": "algorynth.kip-language",
+                "editor.wordBasedSuggestions": "off"
+            }
+        },
         "commands": [
             {
                 "command": "kip.runFile",
