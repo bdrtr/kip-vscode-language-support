@@ -1,224 +1,210 @@
-# Kip - Turkish Programming Language Extension
+# Kip - Turkish Programming Language Support for VS Code
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/algorynth/kip-vscode-language-support/releases/latest)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Latest Release](https://img.shields.io/github/v/release/algorynth/kip-vscode-language-support)](https://github.com/algorynth/kip-vscode-language-support/releases/latest)
+VS Code extension for the Kip programming language - a Turkish grammar-based programming language.
 
-> ⚠️ **Not an official extension** - This is a community-maintained extension for the Kip programming language.
+## Features
 
-Türkçe tabanlı programlama dili **Kip** için Visual Studio Code eklentisi.
+### 🎨 Semantic Syntax Highlighting
+- Full semantic token support via LSP
+- Multi-word type recognition (e.g., "öğe listesi")
+- Function, type, variable, and keyword highlighting
+- Real-time syntax analysis
 
-## 📥 Kurulum
+### 🔍 Language Server Protocol (LSP) Features
+- **Go to Definition** - Navigate to symbol definitions
+- **Find All References** - Find all usages of symbols
+- **Semantic Tokens** - Advanced syntax highlighting
+- **Document Symbols** - Outline view support
+- **Workspace Symbols** - Search symbols across workspace
+- **Code Formatting** - Automatic code formatting
+- **Code Actions** - Quick fixes and code actions
+- **Code Lens** - Additional code information
 
-### GitHub Releases'dan VSIX İndirme (Önerilen)
+### 🚀 Code Execution
+- Run Kip files directly from VS Code
+- Integrated Kip language runner
 
-Main branch'e her push'ta kod otomatik derlenir ve VSIX dosyası GitHub Actions artifact olarak yüklenir:
+### 📝 Language Support
+- Turkish grammar-based syntax
+- Type declarations: `Bir ... ya ... olabilir`
+- Function definitions with gerund patterns (`-mak/-mek`)
+- Variable definitions: `X Y Z diyelim`
+- Pattern matching and conditional expressions
 
-1. **[GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases/latest)** sayfasına gidin
-   - Veya direkt link: [Latest Release](https://github.com/algorynth/kip-vscode-language-support/releases/latest)
-2. **Assets** bölümünden `kip-language-X.X.X.vsix` dosyasını indirin
-3. VS Code'da yükleyin:
-   ```bash
-   code --install-extension kip-language-X.X.X.vsix
-   ```
+## Installation
 
-**Alternatif:** GitHub Actions artifact'ından indirme:
-1. Repository'nin **Actions** sekmesine gidin
-2. En son başarılı workflow run'ına tıklayın
-3. **Artifacts** bölümünden `kip-language-extension` artifact'ını indirin
+### From VSIX File
+1. Download the latest `.vsix` file from [Releases](https://github.com/algorynth/kip-vscode-language-support/releases)
+2. Open VS Code
+3. Go to Extensions view (`Ctrl+Shift+X` or `Cmd+Shift+X`)
+4. Click the `...` menu and select "Install from VSIX..."
+5. Select the downloaded `.vsix` file
 
-Veya VS Code içinden:
-1. `Ctrl+Shift+P` tuşlarına basın
-2. "Extensions: Install from VSIX..." yazın
-3. İndirdiğiniz VSIX dosyasını seçin
-
-## ✨ Özellikler
-
-### Temel Özellikler
-- ✅ **Syntax Highlighting** - Türkçe anahtar kelimeler ve syntax vurgulama
-- ✅ **Code Completion** - Akıllı kod tamamlama ve öneriler
-- ✅ **Hover Documentation** - Yerleşik fonksiyonlar için dokümantasyon
-- ✅ **Code Formatting** - Otomatik kod formatlama (`Shift+Alt+F`)
-- ✅ **Run Command** - Kip dosyalarını çalıştırma (Sağ üstteki ▶ butonu veya `Ctrl+Shift+R`)
-- ✅ **Error Diagnostics** - Gerçek zamanlı hata tespiti
-- ✅ **Otomatik Kurulum** - Kip derleyicisi bulunamazsa cross-platform kurulum script'i çalıştırır
-- ✅ **Cross-Platform** - Linux, macOS (Intel/ARM), Windows desteği
-
-### LSP Özellikleri (Language Server Protocol)
-- ✅ **Go to Definition** (`F12`) - Tanıma git
-- ✅ **Find References** (`Shift+F12`) - Tüm referansları bul
-- ✅ **Rename Symbol** (`F2`) - Sembol yeniden adlandırma
-- ✅ **Code Actions** (`Ctrl+.`) - Hızlı düzeltmeler
-- ✅ **Code Lens** - Referans sayısı gösterimi (ayarlanabilir)
-- ✅ **Outline** (`Ctrl+Shift+O`) - Sembol listesi
-- ✅ **Workspace Symbols** (`Ctrl+T`) - Workspace genelinde arama (ayarlanabilir)
-
-## 🚀 Kullanım
-
-### Kip Derleyicisi Kurulumu
-
-**İlk Kullanım:**
-- Eğer sistemde `kip` derleyicisi yoksa, extension otomatik kurulum seçeneği sunar
-- "Kur" butonuna tıklayarak cross-platform kurulum script'i çalıştırılır
-- Script otomatik olarak:
-  1. Foma'yı kurar (finite-state morphology toolkit)
-  2. Stack'i kurar (Haskell build tool) - önce apt-get, başarısız olursa resmi installer
-  3. kip-lang repository'sini clone eder
-  4. Build eder ve `~/.local/bin/` dizinine kurar (Linux/macOS) veya `%USERPROFILE%\.local\bin\` (Windows)
-
-**Desteklenen İşletim Sistemleri:**
-- **Linux**: apt-get, dnf, yum, pacman desteği
-- **macOS**: Homebrew desteği
-- **Windows**: PowerShell script desteği (Chocolatey veya resmi Stack installer)
-
-### Kip Dosyası Çalıştırma
-1. `.kip` uzantılı dosya açın
-2. Sağ üstteki **▶ Run** butonuna basın
-3. Veya **Ctrl+Shift+R** (`Cmd+Shift+R` macOS'ta) kısayolu
-
-### Kod Formatlama
-```
-Shift+Alt+F → Tüm dosyayı formatla
+### From Source
+```bash
+git clone https://github.com/algorynth/kip-vscode-language-support.git
+cd kip-vscode-language-support
+npm install
+npm run compile
+npm run package
+# Install the generated .vsix file
 ```
 
-**Format on Save:** `kip.formatOnSave` ayarını `true` yaparak kaydetme sırasında otomatik formatlama yapabilirsiniz.
+## Development
 
-### Navigasyon
-```
-F12 → Tanıma git (LSP gerekli)
-Shift+F12 → Referansları bul (LSP gerekli)
-Ctrl+Shift+O → Sembol listesi (LSP gerekli)
-Ctrl+T → Workspace sembol araması (LSP gerekli, ayarlanabilir)
-```
-
-## 📚 Kod Örnekleri
-
-### Basit Fonksiyon
-```kip
-selamlamak,
-  isim olarak okuyup,
-  ("Merhaba "yla ismin birleşimini) yazmaktır.
-
-selamla.
-```
-
-### Tip Tanımı
-```kip
-Bir gün
-ya pazartesi
-ya salı
-ya çarşamba
-ya perşembe
-ya cuma
-ya cumartesi
-ya pazar
-olabilir.
-```
-
-## 🛠 Geliştirme
-
-### Gereksinimler
+### Prerequisites
 - Node.js 20+
 - npm
-- VS Code 1.80+
+- TypeScript
+- VS Code Extension Development Host
 
-### Kurulum
+### Setup
 ```bash
 npm install
 npm run compile
 ```
 
-### Test ve Kontrol
+### Build
 ```bash
-# Bağımlılıkları kontrol et
-npm run check
-
-# Extension'ı test et
-npm run test
-
-# VSIX oluştur
+npm run compile
 npm run package
-
-# VSIX'i validate et
-npm run validate kip-language-*.vsix
-
-# Tüm kontrolleri yap
-npm run quick-check
 ```
 
-### Debug
-1. `F5` basın (Extension Development Host açılır)
-2. Yeni pencerede `.kip` dosyası açın
-3. Özellikleri test edin
+### Test
+```bash
+# Run extension tests
+npm test
 
-## 📝 Yapılandırma
+# Run LSP tests
+npm run test:lsp
 
-Extension ayarları (`settings.json`):
-```json
-{
-  "kip.compilerPath": "",           // Kip derleyicisinin tam yolu (boş bırakılırsa otomatik bulunur)
-  "kip.lspPath": "",                // Kip LSP sunucusunun tam yolu (boş bırakılırsa otomatik bulunur)
-  "kip.enableCodeLens": true,       // Code Lens'i etkinleştir
-  "kip.formatOnSave": false,        // Kaydetme sırasında formatla
-  "kip.enableWorkspaceSymbols": true // Workspace sembol araması
-}
+# Run all tests
+npm run test:all
 ```
 
-### Binary Bulma Sırası
+### Project Structure
+```
+kip-vscode-language-support/
+├── src/
+│   ├── extension.ts          # Main extension entry point
+│   ├── server/
+│   │   └── server.ts          # LSP server implementation
+│   ├── semanticTokensProvider.ts
+│   ├── completionProvider.ts
+│   ├── hoverProvider.ts
+│   ├── definitionProvider.ts
+│   ├── referenceProvider.ts
+│   ├── renameProvider.ts
+│   ├── codeActionProvider.ts
+│   ├── formattingProvider.ts
+│   ├── diagnosticProvider.ts
+│   └── kipRunner.ts          # Kip file execution
+├── scripts/
+│   ├── test-lsp-detailed.js  # LSP test suite
+│   └── ...
+├── .github/
+│   └── workflows/
+│       └── build-extension.yml # CI/CD workflow
+└── package.json
+```
 
-Extension, `kip` derleyicisini şu sırayla arar:
+## LSP Server
 
-1. **`kip.compilerPath` ayarı** - VS Code ayarlarında belirtilen yol
-2. **Varsayılan kurulum yolu** - `~/.local/bin/kip` (Linux/macOS) veya `%USERPROFILE%\.local\bin\kip.exe` (Windows)
-3. **Sistem PATH'i** - Sistem PATH'inde `kip` komutu (Windows'ta `kip.exe` de aranır)
-4. **Otomatik kurulum** - Kullanıcı onayı ile cross-platform kurulum script'i çalıştırılır
+The extension includes a custom TypeScript-based LSP server that provides:
 
-## 🐛 Sorun Giderme
+- **Document Analysis**: Parses Kip code to extract types, functions, variables, and symbols
+- **Semantic Highlighting**: Identifies and highlights different token types
+- **Code Navigation**: Definition and reference finding
+- **Symbol Management**: Tracks symbols across documents
 
-### Yaygın Sorunlar
+### LSP Features Implemented
+- ✅ Semantic Tokens (full & range)
+- ✅ Completion
+- ✅ Hover
+- ✅ Definition
+- ✅ References
+- ✅ Document Symbols
+- ✅ Workspace Symbols
+- ✅ Formatting
+- ✅ Code Actions
+- ✅ Code Lens
 
-**Kip derleyicisi bulunamıyor:**
-- Extension otomatik kurulum seçeneği sunar
-- Veya VS Code ayarlarından `kip.compilerPath` ayarını kullanarak manuel yol belirtebilirsiniz
-- Sistem PATH'ine `kip` binary'sini ekleyebilirsiniz
+## Usage
 
-**Kurulum script'i başarısız:**
-- İnternet bağlantınızı kontrol edin
-- Gerekli bağımlılıkların (git, curl/wget) kurulu olduğundan emin olun
-- Linux'ta: sudo yetkilerine sahip olduğunuzdan emin olun
-- Windows'ta: PowerShell execution policy'yi kontrol edin (`Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`)
+### Running Kip Files
+1. Open a `.kip` file
+2. Press `F5` or use Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+3. Select "Kip: Run File"
 
-**LSP özellikleri çalışmıyor:**
-- `kip-lsp` binary'sinin kurulu olduğundan emin olun
-- `kip.lspPath` ayarını kontrol edin
-- Developer Console'u kontrol edin (`Ctrl+Shift+I`)
-- Extension Host'u yeniden başlatın (`Ctrl+Shift+P` → "Developer: Restart Extension Host")
+### Code Navigation
+- **Go to Definition**: `F12` or right-click → "Go to Definition"
+- **Find References**: `Shift+F12` or right-click → "Find All References"
+- **Symbol Search**: `Ctrl+T` / `Cmd+T` for workspace symbols
 
-**Extension çalışmıyor:**
-1. VS Code'u yeniden başlatın
-2. Developer Console'u kontrol edin (`Ctrl+Shift+I`)
-3. Extension Host'u yeniden başlatın (`Ctrl+Shift+P` → "Developer: Restart Extension Host")
+### Syntax Highlighting
+Syntax highlighting is provided entirely through the LSP semantic tokens system. No TextMate grammar is used - all highlighting is semantic and context-aware.
 
-## 🤝 Katkıda Bulunma
+## Example Kip Code
 
-1. Fork edin
-2. Feature branch oluşturun (`git checkout -b feature/amazing`)
-3. Commit edin (`git commit -m 'Add amazing feature'`)
-4. Push edin (`git push origin feature/amazing`)
-5. Pull Request açın
+```kip
+Bir (öğe listesi)
+ya boş
+ya da bir öğenin bir öğe listesine eki
+olabilir.
 
-## 📝 Lisans
+(bu öğe listesiyle) (şu öğe listesinin) birleşimi,
+  bu boşsa,
+    şu,
+  ilkin devama ekiyse,
+    ilkin (devamla şunun birleşimine) ekidir.
 
-MIT License - detaylar için [LICENSE](LICENSE) dosyasına bakın.
+(bu öğe listesinin) tersi,
+  bu boşsa,
+    boş,
+  ilkin devama ekiyse,
+    (devamın tersiyle) 
+      (ilkin boşa ekinin) birleşimidir.
 
-## 🔗 Bağlantılar
+((1'in (2'nin boşa ekine) ekinin) tersini) bastır.
+```
 
-- **VS Code Marketplace:** [algorynth.kip-language](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)
-- **Latest Release:** [GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases/latest)
-- **All Releases:** [GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases)
-- **Kip Dili Repo:** [github.com/kip-dili/kip](https://github.com/kip-dili/kip)
-- **Issues:** [GitHub Issues](https://github.com/algorynth/kip-vscode-language-support/issues)
+## CI/CD
 
----
+The project uses GitHub Actions for continuous integration:
 
-**Kip ile mutlu kodlamalar!** 🎉
+- **Build**: Compiles TypeScript and packages extension
+- **Test**: Runs extension tests and LSP tests
+- **Release**: Automatically creates GitHub Releases when tags are pushed (format: `v*`)
+
+### Creating a Release
+```bash
+# Update version in package.json
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+GitHub Actions will automatically:
+1. Build and test the extension
+2. Create a GitHub Release
+3. Attach the VSIX file to the release
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+[Add your license here]
+
+## Links
+
+- Repository: [GitHub](https://github.com/algorynth/kip-vscode-language-support)
+- Issues: [GitHub Issues](https://github.com/algorynth/kip-vscode-language-support/issues)
+- Releases: [GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases)
+
+## Acknowledgments
+
+Built with:
+- [VS Code Language Server Protocol](https://microsoft.github.io/language-server-protocol/)
+- [vscode-languageserver](https://github.com/Microsoft/vscode-languageserver-node)
+- [vscode-languageclient](https://github.com/Microsoft/vscode-languageserver-node)
