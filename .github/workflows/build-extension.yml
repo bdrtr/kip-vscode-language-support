@@ -27,6 +27,12 @@ jobs:
     - name: Compile TypeScript
       run: npm run compile
       
+    - name: Run tests
+      run: npm test
+      
+    - name: Run LSP tests
+      run: npm run test:lsp
+      
     - name: Install vsce
       run: npm install -g @vscode/vsce
       

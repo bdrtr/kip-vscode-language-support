@@ -126,23 +126,37 @@ class LSPTester {
     }
     
     processBuffer() {
-        while (this.buffer.includes('\r\n\r\n')) {
-            const parts = this.buffer.split('\r\n\r\n', 2);
-            const header = parts[0];
-            const body = parts[1];
+        while (true) {
+            // Look for Content-Length header
+            const headerEnd = this.buffer.indexOf('\r\n\r\n');
+            if (headerEnd === -1) break;
             
-            const contentLengthMatch = header.match(/Content-Length: (\d+)/);
-            if (contentLengthMatch) {
-                const contentLength = parseInt(contentLengthMatch[1], 10);
-                if (body.length >= contentLength) {
-                    const message = body.substring(0, contentLength);
-                    this.buffer = body.substring(contentLength);
-                    this.handleMessage(JSON.parse(message));
-                } else {
-                    break; // Wait for more data
+            const header = this.buffer.substring(0, headerEnd);
+            const bodyStart = headerEnd + 4;
+            
+            const contentLengthMatch = header.match(/Content-Length:\s*(\d+)/i);
+            if (!contentLengthMatch) {
+                // Skip malformed header
+                this.buffer = this.buffer.substring(bodyStart);
+                continue;
+            }
+            
+            const contentLength = parseInt(contentLengthMatch[1], 10);
+            const totalLength = bodyStart + contentLength;
+            
+            if (this.buffer.length >= totalLength) {
+                const messageBody = this.buffer.substring(bodyStart, totalLength);
+                this.buffer = this.buffer.substring(totalLength);
+                
+                try {
+                    const message = JSON.parse(messageBody);
+                    this.handleMessage(message);
+                } catch (e) {
+                    // Skip invalid JSON
+                    console.error(`Failed to parse message: ${e.message}`);
                 }
             } else {
-                break;
+                break; // Wait for more data
             }
         }
     }
