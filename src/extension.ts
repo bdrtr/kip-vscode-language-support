@@ -522,9 +522,16 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         clientOptions.errorHandler = {
             error: (error: Error, message: any, count: number) => {
                 // Ignore "no handler" errors for optional LSP methods
-                if (error.message && shouldFilterMessage(error.message)) {
+                const errMsg = error?.message || String(message || '');
+                if (shouldFilterMessage(errMsg) || 
+                    errMsg.includes('failed') || 
+                    errMsg.includes('notification') ||
+                    errMsg.includes('didOpen') ||
+                    errMsg.includes('didChangeConfiguration')) {
+                    // Silently continue for known issues
                     return { action: ErrorAction.Continue };
                 }
+                // For other errors, also continue but log (if not filtered)
                 return { action: ErrorAction.Continue };
             },
             closed: () => ({ action: CloseAction.Restart })
@@ -570,7 +577,33 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
                         if (methodStr === 'initialized' || methodStr.includes('settrace')) {
                             return Promise.resolve();
                         }
-                        return originalSend(method, params);
+                        // Wrap in try-catch to handle notification failures
+                        try {
+                            return originalSend(method, params).catch((err: any) => {
+                                // Silently ignore notification failures
+                                return Promise.resolve();
+                            });
+                        } catch (e) {
+                            // If send itself throws, resolve silently
+                            return Promise.resolve();
+                        }
+                    };
+                }
+                
+                // Also intercept onNotification to filter error messages
+                if (connection && connection.onNotification) {
+                    const originalOnNotification = connection.onNotification.bind(connection);
+                    connection.onNotification = function(handler: any) {
+                        return originalOnNotification((method: string, params: any) => {
+                            // Filter out "no handler" related notifications
+                            if (!shouldFilterMessage(method)) {
+                                try {
+                                    handler(method, params);
+                                } catch (e) {
+                                    // Ignore handler errors
+                                }
+                            }
+                        });
                     };
                 }
             } catch (e) {
