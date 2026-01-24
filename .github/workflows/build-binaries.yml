@@ -61,7 +61,10 @@ jobs:
       - name: Install dependencies (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          choco install foma -y || echo "Foma installation may have failed, continuing..."
+          # Foma Chocolatey'de yok, bu yüzden skip ediyoruz
+          # Windows'ta foma manuel kurulum gerektirir veya binary'ler foma olmadan çalışabilir
+          echo "Skipping foma installation on Windows (not available in Chocolatey)"
+          echo "Note: Binary may require foma DLLs to be present at runtime"
 
       - name: Setup Stack
         uses: haskell-actions/setup@v2
