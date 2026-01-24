@@ -75,6 +75,37 @@ jobs:
       - name: Build with Stack
         working-directory: kip-lang
         run: stack build --copy-bins
+        
+      - name: Create symlink for getDataFileName path
+        working-directory: kip-lang
+        shell: bash
+        run: |
+          # getDataFileName binary'nin build dizinini kullanıyor
+          # Bu dizini oluşturup data dosyalarını oraya kopyalayalım
+          # Böylece binary çalıştığında getDataFileName dosyaları bulabilir
+          
+          # Stack'in data dizinini bul
+          STACK_DATA_DIR=$(stack path --datadir)/kip-0.1.0.0
+          echo "Stack data dir: $STACK_DATA_DIR"
+          
+          # Dizini oluştur
+          mkdir -p "$STACK_DATA_DIR/vendor" "$STACK_DATA_DIR/lib"
+          
+          # Data dosyalarını kopyala
+          if [ -f "vendor/trmorph.fst" ]; then
+            cp "vendor/trmorph.fst" "$STACK_DATA_DIR/vendor/trmorph.fst"
+            echo "✅ Copied vendor/trmorph.fst to $STACK_DATA_DIR/vendor/"
+          fi
+          
+          if [ -d "lib" ]; then
+            cp -r lib/* "$STACK_DATA_DIR/lib/" 2>/dev/null || true
+            echo "✅ Copied lib files to $STACK_DATA_DIR/lib/"
+          fi
+          
+          # List copied files
+          echo "📋 Files in $STACK_DATA_DIR:"
+          ls -la "$STACK_DATA_DIR/vendor/" 2>/dev/null || echo "vendor directory empty"
+          ls -la "$STACK_DATA_DIR/lib/" 2>/dev/null | head -10 || echo "lib directory empty"
 
       - name: Find binary
         id: find_binary
