@@ -890,7 +890,6 @@ try {
     }
     
     connection.listen();
-    log('Server listening on stdio');
 } catch (error) {
     logError('Failed to start LSP server', error);
     process.exit(1);
