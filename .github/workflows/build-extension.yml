@@ -43,32 +43,12 @@ jobs:
     - name: Package extension
       run: npm run package
       
-    - name: Get version and create tag
+    - name: Get version from package.json
       id: version_info
       run: |
         VERSION=$(node -p "require('./package.json').version")
-        SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-        
-        # For main/master branch, use version + short SHA for unique tag
-        if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-          TAG_NAME="v${VERSION}-${SHORT_SHA}"
-          RELEASE_NAME="v${VERSION} (${SHORT_SHA})"
-        # For tags, use the tag name
-        elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-          TAG_NAME="${GITHUB_REF#refs/tags/}"
-          RELEASE_NAME="Release ${TAG_NAME}"
-        else
-          TAG_NAME="v${VERSION}-${SHORT_SHA}"
-          RELEASE_NAME="v${VERSION} (${SHORT_SHA})"
-        fi
-        
         echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-        echo "release_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
         echo "Version: $VERSION"
-        echo "Tag: $TAG_NAME"
-        echo "Release: $RELEASE_NAME"
     
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
@@ -77,19 +57,34 @@ jobs:
         path: '*.vsix'
         retention-days: 30
     
-    - name: Create Release
-      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    - name: Create Release (for version tags only)
+      if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
         files: '*.vsix'
-        tag_name: ${{ steps.version_info.outputs.tag_name }}
-        name: ${{ steps.version_info.outputs.release_name }}
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Create Pre-release (for main branch)
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && !startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: '*.vsix'
+        tag_name: latest
+        name: Latest Build (v${{ steps.version_info.outputs.version }})
         body: |
           ## Latest Build
           
           **Version:** ${{ steps.version_info.outputs.version }}  
           **Commit:** [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
           **Built:** ${{ github.event.head_commit.timestamp || github.run_started_at }}
+          
+          ⚠️ **This is a pre-release build from the main branch.**
+          
+          For stable releases, check [Releases](https://github.com/${{ github.repository }}/releases) for version tags.
           
           ## Installation
           
@@ -98,12 +93,7 @@ jobs:
           3. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS)
           4. Type "Extensions: Install from VSIX..."
           5. Select the downloaded file
-          
-          ## Changes
-          
-          See [commit history](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
         draft: false
-        prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        make_latest: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+        prerelease: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
