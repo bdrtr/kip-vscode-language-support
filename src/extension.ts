@@ -265,9 +265,32 @@ export function activate(context: vscode.ExtensionContext) {
             });
             context.subscriptions.push(configWatcher);
             
-            lspClient.start().then(() => {
-                registerLSPProviders(context, kipSelector, lspClient!);
-            }).catch((err) => {
+            // Start LSP client with retry mechanism for didOpen failures
+            const startLSP = async () => {
+                try {
+                    await lspClient!.start();
+                    // Wait a bit for server to be fully ready before registering providers
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    registerLSPProviders(context, kipSelector, lspClient!);
+                } catch (err) {
+                    const errMsg = err instanceof Error ? err.message : String(err);
+                    // Ignore "no handler" errors
+                    if (!shouldFilterMessage(errMsg)) {
+                        console.error('LSP failed to start:', err);
+                        vscode.window.showWarningMessage(
+                            'Kip LSP başlatılamadı. LSP özellikleri çalışmayabilir.',
+                            'Tekrar Dene'
+                        ).then(action => {
+                            if (action === 'Tekrar Dene') {
+                                // Retry after a delay
+                                setTimeout(() => startLSP(), 2000);
+                            }
+                        });
+                    }
+                }
+            };
+            
+            startLSP().catch((err) => {
                 const errMsg = err instanceof Error ? err.message : String(err);
                 // Ignore "no handler" errors
                 if (!shouldFilterMessage(errMsg)) {
