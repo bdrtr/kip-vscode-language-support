@@ -98,6 +98,30 @@ export function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(formattingProvider, rangeFormattingProvider);
 
+    // Format on Save (if enabled)
+    const formatOnSaveDisposable = vscode.workspace.onWillSaveTextDocument(async (event) => {
+        const config = vscode.workspace.getConfiguration('kip');
+        if (config.get<boolean>('formatOnSave', false) && event.document.languageId === 'kip') {
+            const formatter = new KipFormattingProvider();
+            const docConfig = vscode.workspace.getConfiguration('editor', event.document.uri);
+            const formattingOptions: vscode.FormattingOptions = {
+                tabSize: docConfig.get<number>('tabSize', 4),
+                insertSpaces: docConfig.get<boolean>('insertSpaces', true)
+            };
+            const edits = await formatter.provideDocumentFormattingEdits(
+                event.document,
+                formattingOptions,
+                new vscode.CancellationTokenSource().token
+            );
+            if (edits && edits.length > 0) {
+                const edit = new vscode.WorkspaceEdit();
+                edits.forEach(e => edit.replace(event.document.uri, e.range, e.newText));
+                event.waitUntil(Promise.resolve(edit));
+            }
+        }
+    });
+    context.subscriptions.push(formatOnSaveDisposable);
+
     const diagnosticProvider = new KipDiagnosticProvider();
     context.subscriptions.push(diagnosticProvider);
 

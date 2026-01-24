@@ -32,9 +32,9 @@ Veya VS Code içinden:
 - ✅ **Code Completion** - Akıllı kod tamamlama ve öneriler
 - ✅ **Hover Documentation** - Yerleşik fonksiyonlar için dokümantasyon
 - ✅ **Code Formatting** - Otomatik kod formatlama (`Shift+Alt+F`)
-- ✅ **Run Command** - Kip dosyalarını çalıştırma (`Ctrl+Shift+R`)
+- ✅ **Run Command** - Kip dosyalarını çalıştırma (Sağ üstteki ▶ butonu veya `Ctrl+Shift+R`)
 - ✅ **Error Diagnostics** - Gerçek zamanlı hata tespiti
-- ✅ **Otomatik Kurulum** - Kip derleyicisi bulunamazsa otomatik kurulum script'i çalıştırır
+- ✅ **Otomatik Kurulum** - Kip derleyicisi bulunamazsa cross-platform kurulum script'i çalıştırır
 - ✅ **Cross-Platform** - Linux, macOS (Intel/ARM), Windows desteği
 
 ### LSP Özellikleri (Language Server Protocol)
@@ -42,9 +42,9 @@ Veya VS Code içinden:
 - ✅ **Find References** (`Shift+F12`) - Tüm referansları bul
 - ✅ **Rename Symbol** (`F2`) - Sembol yeniden adlandırma
 - ✅ **Code Actions** (`Ctrl+.`) - Hızlı düzeltmeler
-- ✅ **Code Lens** - Referans sayısı gösterimi
+- ✅ **Code Lens** - Referans sayısı gösterimi (ayarlanabilir)
 - ✅ **Outline** (`Ctrl+Shift+O`) - Sembol listesi
-- ✅ **Workspace Symbols** (`Ctrl+T`) - Workspace genelinde arama
+- ✅ **Workspace Symbols** (`Ctrl+T`) - Workspace genelinde arama (ayarlanabilir)
 
 ## 🚀 Kullanım
 
@@ -55,31 +55,33 @@ Veya VS Code içinden:
 - "Kur" butonuna tıklayarak cross-platform kurulum script'i çalıştırılır
 - Script otomatik olarak:
   1. Foma'yı kurar (finite-state morphology toolkit)
-  2. Stack'i kurar (Haskell build tool)
+  2. Stack'i kurar (Haskell build tool) - önce apt-get, başarısız olursa resmi installer
   3. kip-lang repository'sini clone eder
-  4. Build eder ve `~/.local/bin/` dizinine kurar
+  4. Build eder ve `~/.local/bin/` dizinine kurar (Linux/macOS) veya `%USERPROFILE%\.local\bin\` (Windows)
 
 **Desteklenen İşletim Sistemleri:**
 - **Linux**: apt-get, dnf, yum, pacman desteği
 - **macOS**: Homebrew desteği
-- **Windows**: PowerShell script desteği (Chocolatey veya manuel)
+- **Windows**: PowerShell script desteği (Chocolatey veya resmi Stack installer)
 
 ### Kip Dosyası Çalıştırma
 1. `.kip` uzantılı dosya açın
 2. Sağ üstteki **▶ Run** butonuna basın
-3. Veya **Ctrl+Shift+R** kısayolu
+3. Veya **Ctrl+Shift+R** (`Cmd+Shift+R` macOS'ta) kısayolu
 
 ### Kod Formatlama
 ```
 Shift+Alt+F → Tüm dosyayı formatla
 ```
 
+**Format on Save:** `kip.formatOnSave` ayarını `true` yaparak kaydetme sırasında otomatik formatlama yapabilirsiniz.
+
 ### Navigasyon
 ```
-F12 → Tanıma git
-Shift+F12 → Referansları bul
-Ctrl+Shift+O → Sembol listesi
-Ctrl+T → Workspace sembol araması
+F12 → Tanıma git (LSP gerekli)
+Shift+F12 → Referansları bul (LSP gerekli)
+Ctrl+Shift+O → Sembol listesi (LSP gerekli)
+Ctrl+T → Workspace sembol araması (LSP gerekli, ayarlanabilir)
 ```
 
 ## 📚 Kod Örnekleri
@@ -161,7 +163,7 @@ Extension, `kip` derleyicisini şu sırayla arar:
 
 1. **`kip.compilerPath` ayarı** - VS Code ayarlarında belirtilen yol
 2. **Varsayılan kurulum yolu** - `~/.local/bin/kip` (Linux/macOS) veya `%USERPROFILE%\.local\bin\kip.exe` (Windows)
-3. **Sistem PATH'i** - Sistem PATH'inde `kip` komutu
+3. **Sistem PATH'i** - Sistem PATH'inde `kip` komutu (Windows'ta `kip.exe` de aranır)
 4. **Otomatik kurulum** - Kullanıcı onayı ile cross-platform kurulum script'i çalıştırılır
 
 ## 🐛 Sorun Giderme
@@ -177,14 +179,13 @@ Extension, `kip` derleyicisini şu sırayla arar:
 - İnternet bağlantınızı kontrol edin
 - Gerekli bağımlılıkların (git, curl/wget) kurulu olduğundan emin olun
 - Linux'ta: sudo yetkilerine sahip olduğunuzdan emin olun
-- Windows'ta: PowerShell execution policy'yi kontrol edin
+- Windows'ta: PowerShell execution policy'yi kontrol edin (`Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`)
 
-**LSP modülü yüklenemiyor:**
-```bash
-npm install
-npm run check
-npm run package
-```
+**LSP özellikleri çalışmıyor:**
+- `kip-lsp` binary'sinin kurulu olduğundan emin olun
+- `kip.lspPath` ayarını kontrol edin
+- Developer Console'u kontrol edin (`Ctrl+Shift+I`)
+- Extension Host'u yeniden başlatın (`Ctrl+Shift+P` → "Developer: Restart Extension Host")
 
 **Extension çalışmıyor:**
 1. VS Code'u yeniden başlatın

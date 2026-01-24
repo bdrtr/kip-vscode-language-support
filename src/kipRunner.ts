@@ -92,8 +92,19 @@ export class KipRunner {
         const homeDir = process.env.HOME || process.env.USERPROFILE;
         if (homeDir) {
             const defaultPath = path.join(homeDir, '.local', 'bin', 'kip');
-            if (fs.existsSync(defaultPath)) {
-                return defaultPath;
+            const defaultPathWin = path.join(homeDir, '.local', 'bin', 'kip.exe');
+            
+            if (process.platform === 'win32') {
+                if (fs.existsSync(defaultPathWin)) {
+                    return defaultPathWin;
+                }
+                if (fs.existsSync(defaultPath)) {
+                    return defaultPath;
+                }
+            } else {
+                if (fs.existsSync(defaultPath)) {
+                    return defaultPath;
+                }
             }
         }
 
@@ -103,7 +114,18 @@ export class KipRunner {
                 if (!error && stdout?.trim()) {
                     resolve(stdout.trim());
                 } else {
-                    resolve(null);
+                    // Windows'ta .exe uzantısı ile de dene
+                    if (process.platform === 'win32') {
+                        child_process.exec('where kip.exe', (error2, stdout2) => {
+                            if (!error2 && stdout2?.trim()) {
+                                resolve(stdout2.trim());
+                            } else {
+                                resolve(null);
+                            }
+                        });
+                    } else {
+                        resolve(null);
+                    }
                 }
             });
         });
