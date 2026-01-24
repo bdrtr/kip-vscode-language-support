@@ -112,6 +112,13 @@
                     "default": true,
                     "description": "Workspace sembol aramasını etkinleştir (Ctrl+T)",
                     "scope": "resource"
+                },
+                "[kip]": {
+                    "type": "object",
+                    "default": {
+                        "editor.defaultFormatter": "algorynth.kip-language"
+                    },
+                    "description": "Kip dosyaları için editör ayarları"
                 }
             }
         },
