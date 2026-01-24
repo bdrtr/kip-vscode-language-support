@@ -69,7 +69,7 @@ function loadLSPProviders() {
 
 // Global filter for LSP "no handler" messages
 // kip-lsp only implements: DidOpen, DidChange, DidSave, Hover, Definition, Completion, Formatting
-// It does NOT implement: Initialized, SetTrace, CodeLens, SemanticTokens, etc.
+// It does NOT implement: Initialized, SetTrace, CodeLens, SemanticTokens, DocumentSymbol, etc.
 function shouldFilterMessage(message: string): boolean {
     const msg = String(message).toLowerCase();
     return msg.includes('no handler for') || 
@@ -78,9 +78,14 @@ function shouldFilterMessage(message: string): boolean {
            msg.includes('smethod_textdocumentcodelens') ||
            msg.includes('smethod_semantictokens') ||
            msg.includes('smethod_semantictokensfull') ||
+           msg.includes('smethod_textdocumentdocumentsymbol') ||
            msg.includes('lsp: no handler') ||
-           msg.includes('sending notification') && (msg.includes('failed') || msg.includes('error')) ||
-           msg.includes('workspace/didchangeconfiguration') && msg.includes('failed');
+           (msg.includes('sending') && (msg.includes('notification') || msg.includes('request')) && (msg.includes('failed') || msg.includes('error'))) ||
+           msg.includes('workspace/didchangeconfiguration') ||
+           msg.includes('textdocument/didopen') && msg.includes('failed') ||
+           msg.includes('textdocument/documentsymbol') ||
+           msg.includes('method not found') ||
+           msg.includes('-32601'); // JSON-RPC Method not found error code
 }
 
 // Override console methods globally to filter LSP warnings
@@ -265,32 +270,40 @@ export function activate(context: vscode.ExtensionContext) {
             });
             context.subscriptions.push(configWatcher);
             
-            // Start LSP client with retry mechanism for didOpen failures
-            const startLSP = async () => {
+            // Start LSP client with retry mechanism and better error handling
+            const startLSP = async (retryCount = 0) => {
+                const maxRetries = 3;
                 try {
                     await lspClient!.start();
-                    // Wait a bit for server to be fully ready before registering providers
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // Wait longer for server to be fully ready before registering providers
+                    // This helps prevent didOpen notification failures
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                     registerLSPProviders(context, kipSelector, lspClient!);
                 } catch (err) {
                     const errMsg = err instanceof Error ? err.message : String(err);
-                    // Ignore "no handler" errors
+                    // Ignore "no handler" errors and known LSP issues
                     if (!shouldFilterMessage(errMsg)) {
-                        console.error('LSP failed to start:', err);
-                        vscode.window.showWarningMessage(
-                            'Kip LSP başlatılamadı. LSP özellikleri çalışmayabilir.',
-                            'Tekrar Dene'
-                        ).then(action => {
-                            if (action === 'Tekrar Dene') {
-                                // Retry after a delay
-                                setTimeout(() => startLSP(), 2000);
-                            }
-                        });
+                        if (retryCount < maxRetries) {
+                            // Retry automatically
+                            console.log(`LSP startup attempt ${retryCount + 1}/${maxRetries}, retrying...`);
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            return startLSP(retryCount + 1);
+                        } else {
+                            console.error('LSP failed to start after retries:', err);
+                            vscode.window.showWarningMessage(
+                                'Kip LSP başlatılamadı. LSP özellikleri çalışmayabilir.',
+                                'Tekrar Dene'
+                            ).then(action => {
+                                if (action === 'Tekrar Dene') {
+                                    startLSP(0);
+                                }
+                            });
+                        }
                     }
                 }
             };
             
-            startLSP().catch((err) => {
+            startLSP(0).catch((err) => {
                 const errMsg = err instanceof Error ? err.message : String(err);
                 // Ignore "no handler" errors
                 if (!shouldFilterMessage(errMsg)) {
@@ -551,23 +564,29 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         const CloseAction = CloseActionEnum;
         clientOptions.errorHandler = {
             error: (error: Error, message: any, count: number) => {
-                // Ignore "no handler" errors for optional LSP methods
+                // Ignore ALL "no handler" errors and notification failures
                 const errMsg = error?.message || String(message || '');
                 const errMsgLower = errMsg.toLowerCase();
                 
-                // Filter all known LSP issues that kip-lsp doesn't support
+                // Filter ALL known LSP issues that kip-lsp doesn't support
+                // This includes: Initialized, SetTrace, CodeLens, SemanticTokens, DocumentSymbol, etc.
                 if (shouldFilterMessage(errMsg) || 
                     errMsgLower.includes('failed') || 
+                    errMsgLower.includes('error') ||
                     errMsgLower.includes('notification') ||
+                    errMsgLower.includes('request') ||
                     errMsgLower.includes('didopen') ||
                     errMsgLower.includes('didchangeconfiguration') ||
                     errMsgLower.includes('codelens') ||
                     errMsgLower.includes('semantictokens') ||
-                    errMsgLower.includes('no handler')) {
-                    // Silently continue for known issues (kip-lsp doesn't support these features)
+                    errMsgLower.includes('documentsymbol') ||
+                    errMsgLower.includes('no handler') ||
+                    errMsgLower.includes('method not found') ||
+                    errMsgLower.includes('-32601')) {
+                    // Silently continue for ALL known issues (kip-lsp doesn't support these features)
                     return { action: ErrorAction.Continue };
                 }
-                // For other errors, also continue but log (if not filtered)
+                // For other errors, also continue (don't crash the extension)
                 return { action: ErrorAction.Continue };
             },
             closed: () => ({ action: CloseAction.Restart })
@@ -609,24 +628,57 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
                     const originalSend = connection.sendNotification.bind(connection);
                     connection.sendNotification = function(method: string, params?: any) {
                         const methodStr = String(method).toLowerCase();
-                        // Don't send unsupported notifications (matching Haskell's handler list)
+                        
+                        // Don't send ANY unsupported notifications (matching Haskell's handler list)
                         // kip-lsp only supports: DidOpen, DidChange, DidSave
-                        if (methodStr === 'initialized' || 
-                            methodStr.includes('settrace') ||
-                            methodStr.includes('codelens') ||
-                            methodStr.includes('semantictokens')) {
+                        const unsupported = [
+                            'initialized',
+                            'settrace',
+                            'codelens',
+                            'semantictokens',
+                            'workspace/didchangeconfiguration',
+                            'workspace/didchangeconfiguration'
+                        ];
+                        
+                        if (unsupported.some(u => methodStr.includes(u))) {
                             return Promise.resolve();
                         }
-                        // Wrap in try-catch to handle notification failures
-                        try {
-                            return originalSend(method, params).catch((err: any) => {
-                                // Silently ignore notification failures (server doesn't support it)
-                                const errMsg = String(err?.message || err || '').toLowerCase();
-                                if (errMsg.includes('failed') || 
-                                    errMsg.includes('no handler') ||
-                                    errMsg.includes('didchangeconfiguration')) {
+                        
+                        // Special handling for didOpen with retry
+                        if (methodStr === 'textdocument/didopen') {
+                            let retries = 3;
+                            const trySend = () => {
+                                try {
+                                    return originalSend(method, params).catch((err: any) => {
+                                        retries--;
+                                        if (retries > 0) {
+                                            return new Promise(resolve => {
+                                                setTimeout(() => {
+                                                    trySend().then(resolve).catch(() => resolve(undefined));
+                                                }, 200);
+                                            });
+                                        }
+                                        return Promise.resolve();
+                                    });
+                                } catch (e) {
+                                    retries--;
+                                    if (retries > 0) {
+                                        return new Promise(resolve => {
+                                            setTimeout(() => {
+                                                trySend().then(resolve).catch(() => resolve(undefined));
+                                            }, 200);
+                                        });
+                                    }
                                     return Promise.resolve();
                                 }
+                            };
+                            return trySend();
+                        }
+                        
+                        // Wrap in try-catch to handle ALL notification failures
+                        try {
+                            return originalSend(method, params).catch((err: any) => {
+                                // Silently ignore ALL notification failures
                                 return Promise.resolve();
                             });
                         } catch (e) {
@@ -634,6 +686,37 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
                             return Promise.resolve();
                         }
                     };
+                    
+                    // Also intercept sendRequest to filter unsupported requests
+                    if (connection.sendRequest && typeof connection.sendRequest === 'function') {
+                        const originalSendRequest = connection.sendRequest.bind(connection);
+                        connection.sendRequest = function(method: string, params?: any) {
+                            const methodStr = String(method).toLowerCase();
+                            const unsupportedRequests = [
+                                'codelens',
+                                'semantictokens',
+                                'textdocument/documentsymbol'
+                            ];
+                            
+                            if (unsupportedRequests.some(u => methodStr.includes(u))) {
+                                return Promise.resolve(null);
+                            }
+                            
+                            try {
+                                return originalSendRequest(method, params).catch((err: any) => {
+                                    const errMsg = String(err?.message || err || '').toLowerCase();
+                                    if (errMsg.includes('no handler') || 
+                                        errMsg.includes('method not found') ||
+                                        errMsg.includes('-32601')) {
+                                        return Promise.resolve(null);
+                                    }
+                                    return Promise.reject(err);
+                                });
+                            } catch (e) {
+                                return Promise.resolve(null);
+                            }
+                        };
+                    }
                 }
                 
                 // Also intercept onNotification to filter error messages
