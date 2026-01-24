@@ -299,14 +299,12 @@ function analyzeDocument(text: string): Omit<DocumentState, 'text' | 'diagnostic
         visitFunctionCall(node: FunctionCall) {
             variableRefs.add(node.functionName);
             // Recursively collect variable references from arguments
-            // Use a Set to track visited nodes to prevent infinite loops
-            const visited = new WeakSet<Expression>();
+            // Use depth limit to prevent infinite loops (but allow same expression in different contexts)
             const visitExpr = (expr: Expression, depth: number = 0) => {
-                // Prevent infinite loops by tracking visited expressions and limiting depth
-                if (depth > 100 || visited.has(expr)) {
+                // Prevent stack overflow by limiting depth
+                if (depth > 100) {
                     return;
                 }
-                visited.add(expr);
                 
                 if (expr.type === 'VariableReference') {
                     variableRefs.add((expr as VariableReference).name);
