@@ -213,6 +213,5 @@ jobs:
           name: Kip Binaries ${{ steps.get_version.outputs.tag }}
           draft: false
           prerelease: false
-          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
