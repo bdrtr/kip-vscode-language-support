@@ -35,6 +35,17 @@ import {
     SemanticTokensRangeParams
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
+import { parse, tokenize } from './parser';
+import { 
+    Program, 
+    ASTVisitor, 
+    TypeDeclaration, 
+    FunctionDefinition, 
+    VariableDefinition, 
+    FunctionCall, 
+    VariableReference,
+    Expression
+} from './ast';
 
 // Logging helper - only log errors in production
 const DEBUG = process.env.NODE_ENV !== 'production';
@@ -236,6 +247,9 @@ function validateDocument(document: TextDocument): void {
 }
 
 function analyzeDocument(text: string): Omit<DocumentState, 'text' | 'diagnostics'> {
+    // Parse into AST
+    const ast = parse(text);
+    
     const functions = new Set<string>();
     const types = new Set<string>();
     const typePhrases = new Map<string, string>(); // Maps type phrase to base type name
@@ -243,178 +257,96 @@ function analyzeDocument(text: string): Omit<DocumentState, 'text' | 'diagnostic
     const variableRefs = new Set<string>(); // All variable references in expressions
     const symbols: SymbolInformation[] = [];
     
-    // Tokenize document (including strings)
-    const tokenPattern = /\d+(?:'?\p{L}+)?|\p{L}+(?:-\p{L}+)*|[(),.]|"[^"]*"/gu;
-    const tokens: Array<{ token: string; start: number; line: number; char: number }> = [];
-    
-    let lineNum = 0;
-    let match;
-    
-    while ((match = tokenPattern.exec(text)) !== null) {
-        const token = match[0];
-        const start = match.index;
-        const textBefore = text.substring(0, start);
-        const linesBefore = textBefore.split('\n');
-        lineNum = linesBefore.length - 1;
-        const charInLine = linesBefore[linesBefore.length - 1].length;
+    // Visit AST to extract symbols
+    const visitor: ASTVisitor = {
+        visitTypeDeclaration(node: TypeDeclaration) {
+            types.add(node.name);
+            node.nameParts.forEach(part => {
+                types.add(part);
+                typePhrases.set(part, node.name);
+            });
+            typePhrases.set(node.name, node.name);
+            
+            symbols.push({
+                name: node.name,
+                kind: SymbolKind.Class,
+                location: {
+                    uri: '',
+                    range: node.range
+                }
+            });
+        },
         
-        tokens.push({ token, start, line: lineNum, char: charInLine });
-    }
-    
-    // Find type declarations: "Bir ... ya ... olabilir" pattern
-    // Pattern: "Bir" -> (optional params) -> type name -> "ya" -> constructors -> "olabilir"
-    for (let i = 0; i < tokens.length; i++) {
-        if (tokens[i].token === 'Bir') {
-            // Look for "ya" after "Bir"
-            let foundYa = false;
-            let typeStart = i + 1;
-            let typeEnd = -1;
-            
-            for (let j = i + 1; j < tokens.length; j++) {
-                if (tokens[j].token === 'ya') {
-                    foundYa = true;
-                    typeEnd = j;
-                    break;
-                }
-            }
-            
-            if (foundYa && typeEnd > typeStart) {
-                // Extract type name - can be in parentheses like "(öğe listesi)"
-                const typeTokens: string[] = [];
-                let inParens = false;
-                
-                for (let k = typeStart; k < typeEnd; k++) {
-                    if (tokens[k].token === '(') {
-                        inParens = true;
-                        continue;
-                    }
-                    if (tokens[k].token === ')') {
-                        inParens = false;
-                        continue;
-                    }
-                    if (/^\p{L}/u.test(tokens[k].token) && !kipKeywords.has(tokens[k].token)) {
-                        typeTokens.push(tokens[k].token);
-                    }
-                }
-                
-                if (typeTokens.length > 0) {
-                    // Add full phrase (e.g., "öğe listesi")
-                    const fullTypeName = typeTokens.join(' ');
-                    types.add(fullTypeName);
-                    
-                    // Also add individual words as type references
-                    typeTokens.forEach(word => {
-                        types.add(word);
-                        typePhrases.set(word, fullTypeName);
-                    });
-                    
-                    typePhrases.set(fullTypeName, fullTypeName);
-                }
-            }
-        }
-    }
-    
-    // Find variable definitions: "X Y Z diyelim" pattern (Defn)
-    // Pattern: items... -> last item (Var) -> "diyelim" -> "."
-    for (let i = 0; i < tokens.length; i++) {
-        if (tokens[i].token === 'diyelim') {
-            // Look backwards for the variable name (last identifier before "diyelim")
-            for (let j = i - 1; j >= 0 && j >= i - 20; j--) {
-                const token = tokens[j].token;
-                if (/^\p{L}/u.test(token) && !kipKeywords.has(token) && token !== '(' && token !== ')') {
-                    // Found variable name
-                    variables.add(token);
-                    break;
-                }
-            }
-        }
-    }
-    
-    // Find function definitions: "(args) name," pattern or gerund pattern
-    // Pattern 1: "(arg1 type1) (arg2 type2) name," -> Function
-    // Pattern 2: "name...mak/mek," -> Function (gerund)
-    for (let i = 0; i < tokens.length; i++) {
-        // Check for gerund pattern (ends with "mak" or "mek" followed by comma)
-        if (i + 1 < tokens.length && tokens[i + 1].token === ',') {
-            const token = tokens[i].token;
-            if ((token.endsWith('mak') || token.endsWith('mek')) && 
-                /^\p{L}/u.test(token) && 
-                !kipKeywords.has(token) &&
-                token.length > 3) {
-                // Gerund function
-                const baseName = token.slice(0, -3);
-                functions.add(baseName);
-                functions.add(token); // Also add full gerund form
-            }
-        }
-        
-        // Check for function pattern: "(arg type) name,"
-        if (tokens[i].token === '(' && i + 3 < tokens.length) {
-            // Look for closing paren, then identifier, then comma
-            let parenCount = 1;
-            let j = i + 1;
-            while (j < tokens.length && parenCount > 0) {
-                if (tokens[j].token === '(') parenCount++;
-                if (tokens[j].token === ')') parenCount--;
-                j++;
-            }
-            
-            if (parenCount === 0 && j < tokens.length) {
-                // Found closing paren, check if next is identifier then comma
-                if (j + 1 < tokens.length && 
-                    /^\p{L}/u.test(tokens[j].token) && 
-                    !kipKeywords.has(tokens[j].token) &&
-                    tokens[j + 1].token === ',') {
-                    functions.add(tokens[j].token);
-                }
-            }
-        }
-    }
-    
-    // Find all variable references in expressions (not just definitions)
-    // These are identifiers that appear in expressions but are not keywords/types/functions
-    // We'll identify them by context - they appear in expressions but aren't defined as functions/types
-    for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i].token;
-        if (/^\p{L}/u.test(token) && 
-            !kipKeywords.has(token) &&
-            !types.has(token) &&
-            !functions.has(token) &&
-            token !== '(' && token !== ')' && token !== ',' && token !== '.') {
-            // Potential variable reference - add if it's not already a defined variable
-            // We'll refine this by checking if it appears in expression contexts
-            variableRefs.add(token);
-        }
-    }
-    
-    // Create symbols
-    const allIdentifiers = new Set([...functions, ...types, ...variables]);
-    for (const identifier of allIdentifiers) {
-        // Find first occurrence
-        const firstToken = tokens.find(t => t.token === identifier);
-        if (firstToken) {
-            let kind: SymbolKind;
-            if (functions.has(identifier)) {
-                kind = SymbolKind.Function;
-            } else if (types.has(identifier)) {
-                kind = SymbolKind.Class;
-            } else {
-                kind = SymbolKind.Variable;
+        visitFunctionDefinition(node: FunctionDefinition) {
+            functions.add(node.name);
+            if (node.isGerund) {
+                functions.add(node.name + (node.name.endsWith('a') ? 'mak' : 'mek'));
             }
             
             symbols.push({
-                name: identifier,
-                kind,
+                name: node.name,
+                kind: SymbolKind.Function,
                 location: {
-                    uri: '', // Will be set by caller
-                    range: {
-                        start: { line: firstToken.line, character: firstToken.char },
-                        end: { line: firstToken.line, character: firstToken.char + identifier.length }
-                    }
+                    uri: '',
+                    range: node.range
                 }
             });
+        },
+        
+        visitVariableDefinition(node: VariableDefinition) {
+            node.names.forEach(name => {
+                variables.add(name);
+                symbols.push({
+                    name,
+                    kind: SymbolKind.Variable,
+                    location: {
+                        uri: '',
+                        range: node.range
+                    }
+                });
+            });
+        },
+        
+        visitFunctionCall(node: FunctionCall) {
+            variableRefs.add(node.functionName);
+            // Recursively collect variable references from arguments
+            const visitExpr = (expr: Expression) => {
+                if (expr.type === 'VariableReference') {
+                    variableRefs.add((expr as VariableReference).name);
+                } else if (expr.type === 'FunctionCall') {
+                    const call = expr as FunctionCall;
+                    variableRefs.add(call.functionName);
+                    call.arguments.forEach(visitExpr);
+                }
+            };
+            node.arguments.forEach(visitExpr);
+        },
+        
+        visitVariableReference(node: VariableReference) {
+            variableRefs.add(node.name);
         }
-    }
+    };
+    
+    // Traverse AST
+    ast.declarations.forEach(decl => {
+        if (decl.type === 'TypeDeclaration') {
+            visitor.visitTypeDeclaration?.(decl as TypeDeclaration);
+        } else if (decl.type === 'FunctionDefinition') {
+            visitor.visitFunctionDefinition?.(decl as FunctionDefinition);
+        } else if (decl.type === 'VariableDefinition') {
+            visitor.visitVariableDefinition?.(decl as VariableDefinition);
+        }
+    });
+    
+    ast.expressions.forEach(expr => {
+        if (expr.type === 'FunctionCall') {
+            visitor.visitFunctionCall?.(expr as FunctionCall);
+        } else if (expr.type === 'VariableReference') {
+            visitor.visitVariableReference?.(expr as VariableReference);
+        }
+    });
+    
+    // Symbols are already created by AST visitor above
     
     return { symbols, functions, types, typePhrases, variables, variableRefs, keywords: kipKeywords };
 }
