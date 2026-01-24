@@ -204,7 +204,6 @@ function registerLSPProviders(
     }
 
     try {
-
         // Semantic Provider oluştur (LSP server'dan semantic tokens alır)
         const semanticProvider = new SemanticProvider(lspClient);
         
