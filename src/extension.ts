@@ -207,6 +207,15 @@ function registerLSPProviders(
         // Semantic Provider oluştur (LSP server'dan semantic tokens alır)
         const semanticProvider = new SemanticProvider(lspClient);
         
+        // Document değiştiğinde semantic cache'i temizle
+        context.subscriptions.push(
+            vscode.workspace.onDidChangeTextDocument((e) => {
+                if (e.document.languageId === 'kip') {
+                    semanticProvider.clearCache(e.document.uri);
+                }
+            })
+        );
+        
         // Hover Provider - Sadece LSP kullanır
         if (KipHoverProvider) {
             const hoverProvider = vscode.languages.registerHoverProvider(
