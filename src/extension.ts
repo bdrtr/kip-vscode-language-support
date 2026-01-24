@@ -151,7 +151,7 @@ export function activate(context: vscode.ExtensionContext) {
     // ============================================
     // FAZ 1: CRITICAL - Run Command (En Öncelikli)
     // ============================================
-    const kipRunner = new KipRunner();
+    const kipRunner = new KipRunner(context);
     const runCommand = vscode.commands.registerCommand('kip.runFile', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
@@ -323,7 +323,7 @@ function registerLSPProviders(
         if (KipRenameProvider) {
             const renameProvider = vscode.languages.registerRenameProvider(
                 kipSelector,
-                new KipRenameProvider(lspClient, semanticProvider)
+                new KipRenameProvider(lspClient)
             );
             context.subscriptions.push(renameProvider);
         }
@@ -332,7 +332,7 @@ function registerLSPProviders(
         if (KipCodeActionProvider) {
             const codeActionProvider = vscode.languages.registerCodeActionsProvider(
                 kipSelector,
-                new KipCodeActionProvider(lspClient, semanticProvider),
+                new KipCodeActionProvider(lspClient),
                 {
                     providedCodeActionKinds: [
                         vscode.CodeActionKind.QuickFix,
