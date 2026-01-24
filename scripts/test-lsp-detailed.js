@@ -285,31 +285,49 @@ async function runTests() {
         await tester.notify('initialized', {});
         await new Promise(resolve => setTimeout(resolve, 300));
         
-        // Open document
-        const testFileUri = `file://${TEST_FILE}`;
-        await tester.notify('textDocument/didOpen', {
-            textDocument: {
-                uri: testFileUri,
-                languageId: 'kip',
-                version: 1,
-                text: TEST_CODE
-            }
-        });
+        // Open document - use absolute path for URI
+        const testFileUri = `file://${TEST_FILE.replace(/\\/g, '/')}`;
+        if (!testFileUri.startsWith('file:///')) {
+            // Ensure absolute path format
+            const absolutePath = path.resolve(TEST_FILE).replace(/\\/g, '/');
+            const finalUri = absolutePath.startsWith('/') ? `file://${absolutePath}` : `file:///${absolutePath}`;
+            await tester.notify('textDocument/didOpen', {
+                textDocument: {
+                    uri: finalUri,
+                    languageId: 'kip',
+                    version: 1,
+                    text: TEST_CODE
+                }
+            });
+        } else {
+            await tester.notify('textDocument/didOpen', {
+                textDocument: {
+                    uri: testFileUri,
+                    languageId: 'kip',
+                    version: 1,
+                    text: TEST_CODE
+                }
+            });
+        }
         // Wait for document analysis to complete
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Get correct URI format
+        const absolutePath = path.resolve(TEST_FILE).replace(/\\/g, '/');
+        const correctUri = absolutePath.startsWith('/') ? `file://${absolutePath}` : `file:///${absolutePath}`;
         
         // Test Semantic Tokens (Full)
         console.log('\n📋 Test Suite: Semantic Tokens');
         await test('Semantic Tokens (Full)', async () => {
             const result = await tester.request('textDocument/semanticTokens/full', {
-                textDocument: { uri: testFileUri }
+                textDocument: { uri: correctUri }
             });
             return result && Array.isArray(result.data) && result.data.length > 0;
         });
         
         await test('Semantic Tokens (Range)', async () => {
             const result = await tester.request('textDocument/semanticTokens/range', {
-                textDocument: { uri: testFileUri },
+                textDocument: { uri: correctUri },
                 range: {
                     start: { line: 0, character: 0 },
                     end: { line: 5, character: 0 }
@@ -322,7 +340,7 @@ async function runTests() {
         console.log('\n📋 Test Suite: Completion');
         await test('Completion at word start', async () => {
             const result = await tester.request('textDocument/completion', {
-                textDocument: { uri: testFileUri },
+                textDocument: { uri: correctUri },
                 position: { line: 0, character: 4 } // After "Bir "
             });
             return Array.isArray(result) && result.length > 0;
@@ -332,7 +350,7 @@ async function runTests() {
         console.log('\n📋 Test Suite: Hover');
         await test('Hover on type', async () => {
             const result = await tester.request('textDocument/hover', {
-                textDocument: { uri: testFileUri },
+                textDocument: { uri: correctUri },
                 position: { line: 0, character: 4 } // "öğe"
             });
             return result && result.contents;
@@ -342,7 +360,7 @@ async function runTests() {
         console.log('\n📋 Test Suite: Definition');
         await test('Definition lookup', async () => {
             const result = await tester.request('textDocument/definition', {
-                textDocument: { uri: testFileUri },
+                textDocument: { uri: correctUri },
                 position: { line: 5, character: 5 } // "birleşimi"
             });
             return Array.isArray(result) || (result && result.uri);
@@ -352,7 +370,7 @@ async function runTests() {
         console.log('\n📋 Test Suite: References');
         await test('Find references', async () => {
             const result = await tester.request('textDocument/references', {
-                textDocument: { uri: testFileUri },
+                textDocument: { uri: correctUri },
                 position: { line: 5, character: 5 }, // "birleşimi"
                 context: { includeDeclaration: true }
             });
@@ -363,7 +381,7 @@ async function runTests() {
         console.log('\n📋 Test Suite: Document Symbols');
         await test('Document symbols', async () => {
             const result = await tester.request('textDocument/documentSymbol', {
-                textDocument: { uri: testFileUri }
+                textDocument: { uri: correctUri }
             });
             return Array.isArray(result) && result.length > 0;
         });
@@ -381,7 +399,7 @@ async function runTests() {
         console.log('\n📋 Test Suite: Formatting');
         await test('Document formatting', async () => {
             const result = await tester.request('textDocument/formatting', {
-                textDocument: { uri: testFileUri },
+                textDocument: { uri: correctUri },
                 options: {
                     tabSize: 2,
                     insertSpaces: true
@@ -394,7 +412,7 @@ async function runTests() {
         console.log('\n📋 Test Suite: Code Actions');
         await test('Code actions', async () => {
             const result = await tester.request('textDocument/codeAction', {
-                textDocument: { uri: testFileUri },
+                textDocument: { uri: correctUri },
                 range: {
                     start: { line: 0, character: 0 },
                     end: { line: 1, character: 0 }
@@ -410,7 +428,7 @@ async function runTests() {
         console.log('\n📋 Test Suite: Code Lens');
         await test('Code lens', async () => {
             const result = await tester.request('textDocument/codeLens', {
-                textDocument: { uri: testFileUri }
+                textDocument: { uri: correctUri }
             });
             return Array.isArray(result);
         });
