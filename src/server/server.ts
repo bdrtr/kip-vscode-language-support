@@ -869,6 +869,10 @@ connection.onRequest('textDocument/semanticTokens/range', (params: SemanticToken
         }
         
         return { data: tokens };
+    } catch (error) {
+        logError('Error in semanticTokens/range', error);
+        return { data: [] };
+    }
 });
 
 // Listen for document changes
