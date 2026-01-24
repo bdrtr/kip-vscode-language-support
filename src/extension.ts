@@ -175,30 +175,65 @@ export function activate(context: vscode.ExtensionContext) {
         if (lspClient) {
             context.subscriptions.push(lspClient);
             
+            // Suppress "no handler" warnings by intercepting client output
+            const originalOutputChannel = (lspClient as any).outputChannel;
+            if (originalOutputChannel) {
+                const originalAppend = originalOutputChannel.append.bind(originalOutputChannel);
+                const originalAppendLine = originalOutputChannel.appendLine.bind(originalOutputChannel);
+                
+                originalOutputChannel.append = function(value: string) {
+                    if (!value.includes('no handler for') && 
+                        !value.includes('SMethod_SetTrace') && 
+                        !value.includes('SMethod_Initialized')) {
+                        originalAppend(value);
+                    }
+                };
+                
+                originalOutputChannel.appendLine = function(value: string) {
+                    if (!value.includes('no handler for') && 
+                        !value.includes('SMethod_SetTrace') && 
+                        !value.includes('SMethod_Initialized')) {
+                        originalAppendLine(value);
+                    }
+                };
+            }
+            
             lspClient.start().then(() => {
                 registerLSPProviders(context, kipSelector, lspClient!);
             }).catch((err) => {
-                console.error('LSP failed to start:', err);
-                vscode.window.showWarningMessage(
-                    'Kip LSP başlatılamadı. LSP özellikleri çalışmayabilir.',
-                    'Tekrar Dene'
-                ).then(action => {
-                    if (action === 'Tekrar Dene') {
-                        vscode.commands.executeCommand('workbench.action.reloadWindow');
-                    }
-                });
+                const errMsg = err instanceof Error ? err.message : String(err);
+                // Ignore "no handler" errors
+                if (!errMsg.includes('no handler for') && 
+                    !errMsg.includes('SetTrace') && 
+                    !errMsg.includes('Initialized')) {
+                    console.error('LSP failed to start:', err);
+                    vscode.window.showWarningMessage(
+                        'Kip LSP başlatılamadı. LSP özellikleri çalışmayabilir.',
+                        'Tekrar Dene'
+                    ).then(action => {
+                        if (action === 'Tekrar Dene') {
+                            vscode.commands.executeCommand('workbench.action.reloadWindow');
+                        }
+                    });
+                }
             });
         }
     } catch (err) {
-        console.error('LSP initialization failed:', err);
-        vscode.window.showErrorMessage(
-            'LSP başlatılamadı. Extension düzgün çalışmayabilir.',
-            'Yeniden Yükle'
-        ).then(action => {
-            if (action === 'Yeniden Yükle') {
-                vscode.commands.executeCommand('workbench.action.reloadWindow');
-            }
-        });
+        const errMsg = err instanceof Error ? err.message : String(err);
+        // Ignore "no handler" errors
+        if (!errMsg.includes('no handler for') && 
+            !errMsg.includes('SetTrace') && 
+            !errMsg.includes('Initialized')) {
+            console.error('LSP initialization failed:', err);
+            vscode.window.showErrorMessage(
+                'LSP başlatılamadı. Extension düzgün çalışmayabilir.',
+                'Yeniden Yükle'
+            ).then(action => {
+                if (action === 'Yeniden Yükle') {
+                    vscode.commands.executeCommand('workbench.action.reloadWindow');
+                }
+            });
+        }
     }
 }
 
