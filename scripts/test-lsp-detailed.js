@@ -295,7 +295,8 @@ async function runTests() {
                 text: TEST_CODE
             }
         });
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // Wait for document analysis to complete
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
         // Test Semantic Tokens (Full)
         console.log('\n📋 Test Suite: Semantic Tokens');

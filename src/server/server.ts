@@ -421,18 +421,14 @@ function analyzeDocument(text: string): Omit<DocumentState, 'text' | 'diagnostic
 
 // Completion handler
 connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] => {
-    log(`Completion requested: ${params.textDocument.uri}`);
-    
     try {
         const document = documents.get(params.textDocument.uri);
         if (!document) {
-            log(`  ⚠️ Document not found: ${params.textDocument.uri}`);
             return [];
         }
         
         const state = documentStates.get(params.textDocument.uri);
         if (!state) {
-            log(`  ⚠️ Document state not found: ${params.textDocument.uri}`);
             return [];
         }
         
@@ -479,57 +475,62 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
 
 // Hover handler
 connection.onHover((params: TextDocumentPositionParams): Hover | null => {
-    const document = documents.get(params.textDocument.uri);
-    if (!document) return null;
-    
-    const state = documentStates.get(params.textDocument.uri);
-    if (!state) return null;
-    
-    const position = params.position;
-    const text = document.getText();
-    const lines = text.split('\n');
-    const line = lines[position.line] || '';
-    const wordRange = getWordAtPosition(line, position.character);
-    
-    if (!wordRange) return null;
-    
-    const word = line.substring(wordRange.start, wordRange.end);
-    
-    let content: MarkupContent | null = null;
-    
-    if (state.functions.has(word)) {
-        content = {
-            kind: MarkupKind.Markdown,
-            value: `**Function:** ${word}`
-        };
-    } else if (state.types.has(word)) {
-        content = {
-            kind: MarkupKind.Markdown,
-            value: `**Type:** ${word}`
-        };
-    } else if (state.variables.has(word)) {
-        content = {
-            kind: MarkupKind.Markdown,
-            value: `**Variable:** ${word}`
-        };
-    } else if (state.keywords.has(word)) {
-        content = {
-            kind: MarkupKind.Markdown,
-            value: `**Keyword:** ${word}`
-        };
+    try {
+        const document = documents.get(params.textDocument.uri);
+        if (!document) return null;
+        
+        const state = documentStates.get(params.textDocument.uri);
+        if (!state) return null;
+        
+        const position = params.position;
+        const text = document.getText();
+        const lines = text.split('\n');
+        const line = lines[position.line] || '';
+        const wordRange = getWordAtPosition(line, position.character);
+        
+        if (!wordRange) return null;
+        
+        const word = line.substring(wordRange.start, wordRange.end);
+        
+        let content: MarkupContent | null = null;
+        
+        if (state.functions.has(word)) {
+            content = {
+                kind: MarkupKind.Markdown,
+                value: `**Function:** ${word}`
+            };
+        } else if (state.types.has(word)) {
+            content = {
+                kind: MarkupKind.Markdown,
+                value: `**Type:** ${word}`
+            };
+        } else if (state.variables.has(word)) {
+            content = {
+                kind: MarkupKind.Markdown,
+                value: `**Variable:** ${word}`
+            };
+        } else if (state.keywords.has(word)) {
+            content = {
+                kind: MarkupKind.Markdown,
+                value: `**Keyword:** ${word}`
+            };
+        }
+        
+        if (content) {
+            return {
+                contents: content,
+                range: {
+                    start: { line: position.line, character: wordRange.start },
+                    end: { line: position.line, character: wordRange.end }
+                }
+            };
+        }
+        
+        return null;
+    } catch (error) {
+        logError(`Error in onHover: ${params.textDocument.uri}`, error);
+        return null;
     }
-    
-    if (content) {
-        return {
-            contents: content,
-            range: {
-                start: { line: position.line, character: wordRange.start },
-                end: { line: position.line, character: wordRange.end }
-            }
-        };
-    }
-    
-    return null;
 });
 
 function getWordAtPosition(line: string, char: number): { start: number; end: number } | null {
@@ -624,44 +625,54 @@ connection.onReferences((params: ReferenceParams): Location[] => {
 
 // Document symbols handler
 connection.onDocumentSymbol((params: DocumentSymbolParams): SymbolInformation[] => {
-    const state = documentStates.get(params.textDocument.uri);
-    if (!state) return [];
-    
-    return state.symbols.map(s => ({
-        ...s,
-        location: {
-            uri: params.textDocument.uri,
-            range: s.location.range
-        }
-    }));
+    try {
+        const state = documentStates.get(params.textDocument.uri);
+        if (!state) return [];
+        
+        return state.symbols.map(s => ({
+            ...s,
+            location: {
+                uri: params.textDocument.uri,
+                range: s.location.range
+            }
+        }));
+    } catch (error) {
+        logError(`Error in onDocumentSymbol: ${params.textDocument.uri}`, error);
+        return [];
+    }
 });
 
 // Document formatting handler
 connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] => {
-    const document = documents.get(params.textDocument.uri);
-    if (!document) return [];
-    
-    const text = document.getText();
-    // Simple formatting: trim trailing whitespace, ensure trailing newline
-    const lines = text.split('\n');
-    const formatted = lines.map(line => line.trimEnd()).join('\n');
-    const finalFormatted = formatted.endsWith('\n') ? formatted : formatted + '\n';
-    
-    if (finalFormatted === text) {
+    try {
+        const document = documents.get(params.textDocument.uri);
+        if (!document) return [];
+        
+        const text = document.getText();
+        // Simple formatting: trim trailing whitespace, ensure trailing newline
+        const lines = text.split('\n');
+        const formatted = lines.map(line => line.trimEnd()).join('\n');
+        const finalFormatted = formatted.endsWith('\n') ? formatted : formatted + '\n';
+        
+        if (finalFormatted === text) {
+            return [];
+        }
+        
+        // Calculate end position correctly
+        const lastLine = lines.length > 0 ? lines.length - 1 : 0;
+        const lastLineLength = lines.length > 0 ? lines[lastLine].length : 0;
+        
+        return [{
+            range: {
+                start: { line: 0, character: 0 },
+                end: { line: lastLine, character: lastLineLength }
+            },
+            newText: finalFormatted
+        }];
+    } catch (error) {
+        logError(`Error in onDocumentFormatting: ${params.textDocument.uri}`, error);
         return [];
     }
-    
-    // Calculate end position correctly
-    const lastLine = lines.length > 0 ? lines.length - 1 : 0;
-    const lastLineLength = lines.length > 0 ? lines[lastLine].length : 0;
-    
-    return [{
-        range: {
-            start: { line: 0, character: 0 },
-            end: { line: lastLine, character: lastLineLength }
-        },
-        newText: finalFormatted
-    }];
 });
 
 // Semantic tokens handler
@@ -768,29 +779,39 @@ connection.onRequest('textDocument/semanticTokens/full', (params: SemanticTokens
 
 // Workspace symbols handler
 connection.onWorkspaceSymbol((params: WorkspaceSymbolParams): SymbolInformation[] => {
-    const allSymbols: SymbolInformation[] = [];
-    
-    documentStates.forEach((state, uri) => {
-        state.symbols.forEach(symbol => {
-            if (!params.query || symbol.name.toLowerCase().includes(params.query.toLowerCase())) {
-                allSymbols.push({
-                    ...symbol,
-                    location: {
-                        uri,
-                        range: symbol.location.range
-                    }
-                });
-            }
+    try {
+        const allSymbols: SymbolInformation[] = [];
+        
+        documentStates.forEach((state, uri) => {
+            state.symbols.forEach(symbol => {
+                if (!params.query || symbol.name.toLowerCase().includes(params.query.toLowerCase())) {
+                    allSymbols.push({
+                        ...symbol,
+                        location: {
+                            uri,
+                            range: symbol.location.range
+                        }
+                    });
+                }
+            });
         });
-    });
-    
-    return allSymbols;
+        
+        return allSymbols;
+    } catch (error) {
+        logError(`Error in onWorkspaceSymbol`, error);
+        return [];
+    }
 });
 
 // Code action handler
 connection.onCodeAction((params: CodeActionParams): CodeAction[] => {
-    // Return empty array for now - can be extended later
-    return [];
+    try {
+        // Return empty array for now - can be extended later
+        return [];
+    } catch (error) {
+        logError(`Error in onCodeAction: ${params.textDocument.uri}`, error);
+        return [];
+    }
 });
 
 // Code lens handler
