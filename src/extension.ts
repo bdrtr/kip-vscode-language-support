@@ -69,9 +69,11 @@ function loadLSPProviders() {
 
 // Global filter for LSP "no handler" messages
 function shouldFilterMessage(message: string): boolean {
-    return message.includes('no handler for') || 
-           message.includes('SMethod_SetTrace') || 
-           message.includes('SMethod_Initialized');
+    const msg = String(message).toLowerCase();
+    return msg.includes('no handler for') || 
+           msg.includes('smethod_settrace') || 
+           msg.includes('smethod_initialized') ||
+           msg.includes('lsp: no handler');
 }
 
 // Override console methods globally to filter LSP warnings
@@ -442,13 +444,30 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
     };
 
 
+    // Create a silent trace output channel
+    const traceOutputChannel = vscode.window.createOutputChannel('Kip LSP Trace', { log: true });
+    const traceOriginalAppend = traceOutputChannel.append.bind(traceOutputChannel);
+    const traceOriginalAppendLine = traceOutputChannel.appendLine.bind(traceOutputChannel);
+    
+    traceOutputChannel.append = function(value: string) {
+        if (!shouldFilterMessage(value)) {
+            traceOriginalAppend(value);
+        }
+    };
+    
+    traceOutputChannel.appendLine = function(value: string) {
+        if (!shouldFilterMessage(value)) {
+            traceOriginalAppendLine(value);
+        }
+    };
+
     const clientOptions: any = {
         documentSelector: [{ scheme: 'file', language: 'kip' }],
         synchronize: {
             fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
         },
         outputChannel: lspOutputChannel,
-        traceOutputChannel: vscode.window.createOutputChannel('Kip LSP Trace', { log: true })
+        traceOutputChannel: traceOutputChannel
     };
     
     // Try to set trace to Off if available
@@ -487,10 +506,11 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         clientOptions
     );
     
-    // Additional filtering: intercept client's internal logging
+    // Additional filtering: intercept client's internal logging and connection
     try {
         const clientAny = client as any;
-        // Override any internal log methods
+        
+        // Override tracer log methods
         if (clientAny._tracer) {
             const originalLog = clientAny._tracer.log;
             if (originalLog) {
@@ -501,6 +521,55 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
                 };
             }
         }
+        
+        // Intercept connection to prevent sending SetTrace and Initialized notifications
+        if (clientAny._connection) {
+            const connection = clientAny._connection;
+            
+            // Override sendNotification to prevent sending problematic notifications
+            if (connection.sendNotification && typeof connection.sendNotification === 'function') {
+                const originalSendNotification = connection.sendNotification.bind(connection);
+                connection.sendNotification = function(method: string, params?: any) {
+                    // Don't send SetTrace or Initialized notifications that cause "no handler" errors
+                    const methodLower = String(method).toLowerCase();
+                    if (methodLower.includes('settrace') || methodLower === 'initialized') {
+                        return Promise.resolve();
+                    }
+                    try {
+                        return originalSendNotification(method, params);
+                    } catch (e) {
+                        // Ignore errors for filtered methods
+                        if (!shouldFilterMessage(String(e))) {
+                            throw e;
+                        }
+                        return Promise.resolve();
+                    }
+                };
+            }
+        }
+        
+        // Also intercept after client starts
+        const originalStart = client.start.bind(client);
+        client.start = function() {
+            return originalStart().then(() => {
+                // Additional interception after start
+                try {
+                    if (clientAny._connection && clientAny._connection.sendNotification) {
+                        const connection = clientAny._connection;
+                        const originalSend = connection.sendNotification.bind(connection);
+                        connection.sendNotification = function(method: string, params?: any) {
+                            const methodLower = String(method).toLowerCase();
+                            if (methodLower.includes('settrace') || methodLower === 'initialized') {
+                                return Promise.resolve();
+                            }
+                            return originalSend(method, params);
+                        };
+                    }
+                } catch (e) {
+                    // Ignore
+                }
+            });
+        };
     } catch (e) {
         // Ignore errors
     }
