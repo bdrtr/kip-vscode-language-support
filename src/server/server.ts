@@ -47,27 +47,25 @@ import {
     Expression
 } from './ast';
 
-// Logging helper - only log errors in production
+// Logging helper - only log critical errors
 const DEBUG = process.env.NODE_ENV !== 'production';
 function log(message: string, ...args: any[]): void {
-    if (DEBUG) {
-        const timestamp = new Date().toISOString();
-        const logMessage = `[LSP Server ${timestamp}] ${message}${args.length > 0 ? ' ' + args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ') : ''}`;
-        console.error(logMessage);
-    }
+    // Removed - no verbose logging in production
 }
 
 function logError(message: string, error: any): void {
+    // Only log critical errors
     const timestamp = new Date().toISOString();
     const errorMessage = `[LSP Server ${timestamp}] ERROR: ${message}`;
     console.error(errorMessage);
     
     if (error instanceof Error) {
-        const details = `  Message: ${error.message}${DEBUG ? `\n  Stack: ${error.stack}` : ''}`;
-        console.error(details);
+        console.error(`  Message: ${error.message}`);
+        if (DEBUG && error.stack) {
+            console.error(`  Stack: ${error.stack}`);
+        }
     } else {
-        const details = `  Error object: ${JSON.stringify(error, null, 2)}`;
-        console.error(details);
+        console.error(`  Error: ${String(error)}`);
     }
 }
 
@@ -139,8 +137,6 @@ const semanticTokensLegend: SemanticTokensLegend = {
 
 // Initialize handler
 connection.onInitialize((params: InitializeParams): InitializeResult => {
-    log('onInitialize called');
-    
     try {
         const capabilities: any = {
             textDocumentSync: TextDocumentSyncKind.Full,
@@ -176,17 +172,11 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 });
 
 connection.onInitialized(() => {
-    log('Server initialized');
-    try {
-        connection.console.log('Kip LSP Server initialized');
-    } catch (error) {
-        console.error('Kip LSP Server initialized');
-    }
+    // Server initialized successfully
 });
 
 // Document change handler
 documents.onDidChangeContent((change: TextDocumentChangeEvent<TextDocument>) => {
-    log(`Document changed: ${change.document.uri}`);
     try {
         validateDocument(change.document);
     } catch (error) {
@@ -196,7 +186,6 @@ documents.onDidChangeContent((change: TextDocumentChangeEvent<TextDocument>) => 
 
 // Document open handler
 documents.onDidOpen((event) => {
-    log(`Document opened: ${event.document.uri}`);
     try {
         validateDocument(event.document);
     } catch (error) {
@@ -205,8 +194,6 @@ documents.onDidOpen((event) => {
 });
 
 function validateDocument(document: TextDocument): void {
-    log(`Validating document: ${document.uri}`);
-    
     try {
         const text = document.getText();
         const diagnostics: Diagnostic[] = [];
@@ -609,11 +596,12 @@ connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] =
 
 // Semantic tokens handler
 connection.onRequest('textDocument/semanticTokens/full', (params: SemanticTokensParams): SemanticTokens => {
-    const document = documents.get(params.textDocument.uri);
-    if (!document) return { data: [] };
-    
-    const state = documentStates.get(params.textDocument.uri);
-    if (!state) return { data: [] };
+    try {
+        const document = documents.get(params.textDocument.uri);
+        if (!document) return { data: [] };
+        
+        const state = documentStates.get(params.textDocument.uri);
+        if (!state) return { data: [] };
     
     const text = document.getText();
     const tokens: number[] = [];
@@ -754,16 +742,16 @@ connection.onCodeLens((params: CodeLensParams): CodeLens[] => {
 
 // Semantic tokens range handler
 connection.onRequest('textDocument/semanticTokens/range', (params: SemanticTokensRangeParams): SemanticTokens => {
-    log(`Semantic tokens range requested: ${params.textDocument.uri}`);
-    const document = documents.get(params.textDocument.uri);
-    if (!document) {
-        return { data: [] };
-    }
-    
-    const state = documentStates.get(params.textDocument.uri);
-    if (!state) {
-        return { data: [] };
-    }
+    try {
+        const document = documents.get(params.textDocument.uri);
+        if (!document) {
+            return { data: [] };
+        }
+        
+        const state = documentStates.get(params.textDocument.uri);
+        if (!state) {
+            return { data: [] };
+        }
     
     // For now, return full semantic tokens (can be optimized later to only return tokens in range)
     const text = document.getText();
