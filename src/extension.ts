@@ -175,29 +175,6 @@ export function activate(context: vscode.ExtensionContext) {
         if (lspClient) {
             context.subscriptions.push(lspClient);
             
-            // Suppress "no handler" warnings by intercepting client output
-            const originalOutputChannel = (lspClient as any).outputChannel;
-            if (originalOutputChannel) {
-                const originalAppend = originalOutputChannel.append.bind(originalOutputChannel);
-                const originalAppendLine = originalOutputChannel.appendLine.bind(originalOutputChannel);
-                
-                originalOutputChannel.append = function(value: string) {
-                    if (!value.includes('no handler for') && 
-                        !value.includes('SMethod_SetTrace') && 
-                        !value.includes('SMethod_Initialized')) {
-                        originalAppend(value);
-                    }
-                };
-                
-                originalOutputChannel.appendLine = function(value: string) {
-                    if (!value.includes('no handler for') && 
-                        !value.includes('SMethod_SetTrace') && 
-                        !value.includes('SMethod_Initialized')) {
-                        originalAppendLine(value);
-                    }
-                };
-            }
-            
             lspClient.start().then(() => {
                 registerLSPProviders(context, kipSelector, lspClient!);
             }).catch((err) => {
@@ -378,11 +355,36 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         transport: TransportKind.stdio
     };
 
+    // Create filtered output channel to suppress "no handler" warnings
+    const lspOutputChannel = vscode.window.createOutputChannel('Kip LSP');
+    const originalAppend = lspOutputChannel.append.bind(lspOutputChannel);
+    const originalAppendLine = lspOutputChannel.appendLine.bind(lspOutputChannel);
+    
+    // Filter out "no handler" warnings
+    lspOutputChannel.append = function(value: string) {
+        const filtered = !value.includes('no handler for') && 
+                        !value.includes('SMethod_SetTrace') && 
+                        !value.includes('SMethod_Initialized');
+        if (filtered) {
+            originalAppend(value);
+        }
+    };
+    
+    lspOutputChannel.appendLine = function(value: string) {
+        const filtered = !value.includes('no handler for') && 
+                        !value.includes('SMethod_SetTrace') && 
+                        !value.includes('SMethod_Initialized');
+        if (filtered) {
+            originalAppendLine(value);
+        }
+    };
+
     const clientOptions: any = {
         documentSelector: [{ scheme: 'file', language: 'kip' }],
         synchronize: {
             fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
-        }
+        },
+        outputChannel: lspOutputChannel
     };
 
     // Add error handler if available
