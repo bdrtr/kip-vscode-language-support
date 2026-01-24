@@ -107,6 +107,34 @@ jobs:
           fi
           cd ..
           ls -lh "${{ matrix.binary_name }}"
+          
+      - name: Copy data files (vendor and lib)
+        shell: bash
+        working-directory: kip-lang
+        run: |
+          # Create vendor and lib directories next to binary
+          mkdir -p "../vendor" "../lib"
+          
+          # Copy vendor/trmorph.fst
+          if [ -f "vendor/trmorph.fst" ]; then
+            cp "vendor/trmorph.fst" "../vendor/trmorph.fst"
+            echo "✅ Copied vendor/trmorph.fst"
+          else
+            echo "⚠️ vendor/trmorph.fst not found in kip-lang"
+          fi
+          
+          # Copy lib files
+          if [ -d "lib" ]; then
+            cp -r lib/* "../lib/" 2>/dev/null || true
+            echo "✅ Copied lib files"
+          else
+            echo "⚠️ lib directory not found in kip-lang"
+          fi
+          
+          # List copied files
+          echo "📋 Copied files:"
+          ls -la "../vendor/" 2>/dev/null || echo "vendor directory empty"
+          ls -la "../lib/" 2>/dev/null | head -10 || echo "lib directory empty"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -135,7 +163,10 @@ jobs:
       - name: Create or update release
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ matrix.binary_name }}
+          files: |
+            ${{ matrix.binary_name }}
+            vendor/trmorph.fst
+            lib/**
           tag_name: ${{ steps.get_version.outputs.version }}
           name: Kip Binaries ${{ steps.get_version.outputs.tag }}
           draft: false
