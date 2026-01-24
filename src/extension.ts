@@ -134,7 +134,7 @@ export function activate(context: vscode.ExtensionContext) {
     // ============================================
     // FAZ 1: CRITICAL - Run Command (En Öncelikli)
     // ============================================
-    const kipRunner = new KipRunner();
+    const kipRunner = new KipRunner(context);
     const runCommand = vscode.commands.registerCommand('kip.runFile', async () => {
         console.log('kip.runFile command executed');
         const editor = vscode.window.activeTextEditor;

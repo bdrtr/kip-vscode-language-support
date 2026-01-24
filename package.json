@@ -28,6 +28,7 @@
         "functional"
     ],
     "activationEvents": [
+        "onLanguage:kip",
         "onStartupFinished"
     ],
     "contributes": {
@@ -162,6 +163,7 @@
     },
     "author": "",
     "dependencies": {
+        "@octokit/rest": "^20.1.1",
         "balanced-match": "^3.0.1",
         "semver": "^7.7.3",
         "vscode-languageclient": "^9.0.1"

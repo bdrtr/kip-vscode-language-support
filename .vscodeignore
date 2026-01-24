@@ -20,4 +20,5 @@ node_modules/**
 !node_modules/vscode-languageserver-types/**
 !node_modules/semver/**
 !node_modules/balanced-match/**
+!node_modules/@octokit/**
 package-lock.json
