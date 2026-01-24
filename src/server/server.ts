@@ -759,116 +759,116 @@ connection.onRequest('textDocument/semanticTokens/range', (params: SemanticToken
         
         // For now, return full semantic tokens (can be optimized later to only return tokens in range)
         const text = document.getText();
-    const tokens: number[] = [];
-    let prevLine = 0;
-    let prevChar = 0;
-    
-    // Use the same improved tokenization logic as full semantic tokens
-    const tokenPattern = /\d+(?:'?\p{L}+)?|\p{L}+(?:-\p{L}+)*|[(),.]|"[^"]*"/gu;
-    let match;
-    
-    // First pass: collect all tokens with positions
-    const allTokens: Array<{ token: string; start: number; line: number; char: number }> = [];
-    while ((match = tokenPattern.exec(text)) !== null) {
-        const token = match[0];
-        const start = match.index;
-        const textBefore = text.substring(0, start);
-        const linesBefore = textBefore.split('\n');
-        const line = linesBefore.length - 1;
-        const char = linesBefore[linesBefore.length - 1].length;
-        allTokens.push({ token, start, line, char });
-    }
-    
-    const range = params.range;
-    
-    // Second pass: check for multi-word type references and individual type words
-    for (let i = 0; i < allTokens.length; i++) {
-        const token = allTokens[i].token;
-        const start = allTokens[i].start;
-        const textBefore = text.substring(0, start);
-        const linesBefore = textBefore.split('\n');
-        const line = linesBefore.length - 1;
-        const char = linesBefore[linesBefore.length - 1].length;
+        const tokens: number[] = [];
+        let prevLine = 0;
+        let prevChar = 0;
         
-        // Check if token is within requested range
-        if (line < range.start.line || line > range.end.line) {
-            continue;
-        }
-        if (line === range.start.line && char < range.start.character) {
-            continue;
-        }
-        if (line === range.end.line && char + token.length > range.end.character) {
-            continue;
+        // Use the same improved tokenization logic as full semantic tokens
+        const tokenPattern = /\d+(?:'?\p{L}+)?|\p{L}+(?:-\p{L}+)*|[(),.]|"[^"]*"/gu;
+        let match;
+        
+        // First pass: collect all tokens with positions
+        const allTokens: Array<{ token: string; start: number; line: number; char: number }> = [];
+        while ((match = tokenPattern.exec(text)) !== null) {
+            const token = match[0];
+            const start = match.index;
+            const textBefore = text.substring(0, start);
+            const linesBefore = textBefore.split('\n');
+            const line = linesBefore.length - 1;
+            const char = linesBefore[linesBefore.length - 1].length;
+            allTokens.push({ token, start, line, char });
         }
         
-        let tokenType: number | null = null;
+        const range = params.range;
         
-        if (token.startsWith('"')) {
-            tokenType = 3; // string
-        } else if (/^\d/.test(token)) {
-            tokenType = 4; // number
-        } else if (state.keywords.has(token)) {
-            tokenType = 0; // keyword
-        } else {
-            // Check for multi-word type references (e.g., "öğe listesi")
-            let foundType = false;
+        // Second pass: check for multi-word type references and individual type words
+        for (let i = 0; i < allTokens.length; i++) {
+            const token = allTokens[i].token;
+            const start = allTokens[i].start;
+            const textBefore = text.substring(0, start);
+            const linesBefore = textBefore.split('\n');
+            const line = linesBefore.length - 1;
+            const char = linesBefore[linesBefore.length - 1].length;
             
-            // Check 2-word phrases
-            if (i + 1 < allTokens.length) {
-                const twoWord = `${token} ${allTokens[i + 1].token}`;
-                if (state.types.has(twoWord)) {
-                    tokenType = 5; // type
-                    foundType = true;
-                }
+            // Check if token is within requested range
+            if (line < range.start.line || line > range.end.line) {
+                continue;
+            }
+            if (line === range.start.line && char < range.start.character) {
+                continue;
+            }
+            if (line === range.end.line && char + token.length > range.end.character) {
+                continue;
             }
             
-            // Check 3-word phrases
-            if (!foundType && i + 2 < allTokens.length) {
-                const threeWord = `${token} ${allTokens[i + 1].token} ${allTokens[i + 2].token}`;
-                if (state.types.has(threeWord)) {
-                    tokenType = 5; // type
-                    foundType = true;
-                }
-            }
+            let tokenType: number | null = null;
             
-            // Check if this word is part of a type (e.g., "öğenin" -> "öğe" -> type)
-            if (!foundType) {
-                // Check if word is a type reference (e.g., "öğenin" contains "öğe")
-                for (const [typeWord, fullType] of state.typePhrases.entries()) {
-                    if (token.includes(typeWord) || typeWord.includes(token)) {
-                        // Check if it's a grammatical variation (Turkish genitive/accusative)
-                        const baseWord = typeWord.split(' ')[0]; // Get first word of type
-                        if (token.startsWith(baseWord) || baseWord.startsWith(token.substring(0, 3))) {
-                            tokenType = 5; // type
-                            foundType = true;
-                            break;
+            if (token.startsWith('"')) {
+                tokenType = 3; // string
+            } else if (/^\d/.test(token)) {
+                tokenType = 4; // number
+            } else if (state.keywords.has(token)) {
+                tokenType = 0; // keyword
+            } else {
+                // Check for multi-word type references (e.g., "öğe listesi")
+                let foundType = false;
+                
+                // Check 2-word phrases
+                if (i + 1 < allTokens.length) {
+                    const twoWord = `${token} ${allTokens[i + 1].token}`;
+                    if (state.types.has(twoWord)) {
+                        tokenType = 5; // type
+                        foundType = true;
+                    }
+                }
+                
+                // Check 3-word phrases
+                if (!foundType && i + 2 < allTokens.length) {
+                    const threeWord = `${token} ${allTokens[i + 1].token} ${allTokens[i + 2].token}`;
+                    if (state.types.has(threeWord)) {
+                        tokenType = 5; // type
+                        foundType = true;
+                    }
+                }
+                
+                // Check if this word is part of a type (e.g., "öğenin" -> "öğe" -> type)
+                if (!foundType) {
+                    // Check if word is a type reference (e.g., "öğenin" contains "öğe")
+                    for (const [typeWord, fullType] of state.typePhrases.entries()) {
+                        if (token.includes(typeWord) || typeWord.includes(token)) {
+                            // Check if it's a grammatical variation (Turkish genitive/accusative)
+                            const baseWord = typeWord.split(' ')[0]; // Get first word of type
+                            if (token.startsWith(baseWord) || baseWord.startsWith(token.substring(0, 3))) {
+                                tokenType = 5; // type
+                                foundType = true;
+                                break;
+                            }
                         }
                     }
                 }
+                
+                // Check single word types
+                if (!foundType && state.types.has(token)) {
+                    tokenType = 5; // type
+                } else if (!foundType && state.functions.has(token)) {
+                    tokenType = 1; // function
+                } else if (!foundType && (state.variables.has(token) || state.variableRefs.has(token))) {
+                    tokenType = 2; // variable (definition or reference)
+                }
             }
             
-            // Check single word types
-            if (!foundType && state.types.has(token)) {
-                tokenType = 5; // type
-            } else if (!foundType && state.functions.has(token)) {
-                tokenType = 1; // function
-            } else if (!foundType && (state.variables.has(token) || state.variableRefs.has(token))) {
-                tokenType = 2; // variable (definition or reference)
+            if (tokenType !== null) {
+                const deltaLine = line - prevLine;
+                const deltaChar = deltaLine === 0 ? char - prevChar : char;
+                
+                tokens.push(deltaLine, deltaChar, token.length, tokenType, 0);
+                
+                prevLine = line;
+                prevChar = char;
             }
         }
         
-        if (tokenType !== null) {
-            const deltaLine = line - prevLine;
-            const deltaChar = deltaLine === 0 ? char - prevChar : char;
-            
-            tokens.push(deltaLine, deltaChar, token.length, tokenType, 0);
-            
-            prevLine = line;
-            prevChar = char;
-        }
-    }
-    
-    return { data: tokens };
+        return { data: tokens };
 });
 
 // Listen for document changes
