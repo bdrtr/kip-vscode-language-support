@@ -10,9 +10,6 @@ import type { LanguageClient as LanguageClientType } from 'vscode-languageclient
 let LanguageClient: typeof import('vscode-languageclient/node').LanguageClient | null = null;
 let TransportKind: typeof import('vscode-languageclient/node').TransportKind | null = null;
 
-// Logging helper - only log errors in production
-const DEBUG = process.env.NODE_ENV !== 'production';
-
 // LSP Provider imports - sadece LSP mevcut olduğunda kullanılacak
 let KipDefinitionProvider: typeof import('./definitionProvider').KipDefinitionProvider | null = null;
 let KipReferenceProvider: typeof import('./referenceProvider').KipReferenceProvider | null = null;
@@ -35,7 +32,7 @@ try {
         const definitionModule = require('./definitionProvider');
         KipDefinitionProvider = definitionModule.KipDefinitionProvider;
     } catch (e) {
-        if (DEBUG) console.warn('Definition provider not available:', e instanceof Error ? e.message : String(e));
+        // Definition provider not available
     }
     
     try {
@@ -43,35 +40,35 @@ try {
         KipReferenceProvider = referenceModule.KipReferenceProvider;
         KipDocumentHighlightProvider = referenceModule.KipDocumentHighlightProvider;
     } catch (e) {
-        if (DEBUG) console.warn('Reference provider not available:', e instanceof Error ? e.message : String(e));
+        // Reference provider not available
     }
     
     try {
         const renameModule = require('./renameProvider');
         KipRenameProvider = renameModule.KipRenameProvider;
     } catch (e) {
-        if (DEBUG) console.warn('Rename provider not available:', e instanceof Error ? e.message : String(e));
+        // Rename provider not available
     }
     
     try {
         const codeActionModule = require('./codeActionProvider');
         KipCodeActionProvider = codeActionModule.KipCodeActionProvider;
     } catch (e) {
-        if (DEBUG) console.warn('Code action provider not available:', e instanceof Error ? e.message : String(e));
+        // Code action provider not available
     }
     
     try {
         const codeLensModule = require('./codeLensProvider');
         KipCodeLensProvider = codeLensModule.KipCodeLensProvider;
     } catch (e) {
-        if (DEBUG) console.warn('Code lens provider not available:', e instanceof Error ? e.message : String(e));
+        // Code lens provider not available
     }
     
     try {
         const symbolModule = require('./symbolProvider');
         KipSymbolProvider = symbolModule.KipSymbolProvider;
     } catch (e) {
-        if (DEBUG) console.warn('Symbol provider not available:', e instanceof Error ? e.message : String(e));
+        // Symbol provider not available
     }
     
     try {
@@ -85,66 +82,40 @@ try {
         const semanticModule = require('./semanticProvider');
         SemanticProvider = semanticModule.SemanticProvider;
     } catch (e) {
-        if (DEBUG) console.warn('Semantic provider not available:', e instanceof Error ? e.message : String(e));
+        // Semantic provider not available
     }
     
     try {
         const semanticTokensModule = require('./semanticTokensProvider');
         KipSemanticTokensProvider = semanticTokensModule.KipSemanticTokensProvider;
     } catch (e) {
-        if (DEBUG) console.warn('Semantic tokens provider not available:', e instanceof Error ? e.message : String(e));
+        // Semantic tokens provider not available
     }
 } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    console.error('LSP module not available:', errMsg);
+    // LSP module not available
 }
 
-// Output channel for logging
+// Output channel for errors only
 let outputChannel: vscode.OutputChannel | null = null;
-function log(message: string, ...args: any[]): void {
-    if (DEBUG) {
-        const timestamp = new Date().toISOString();
-        const logMessage = `[Extension ${timestamp}] ${message}${args.length > 0 ? ' ' + args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ') : ''}`;
-        console.log(logMessage);
-        if (outputChannel) {
-            outputChannel.appendLine(logMessage);
-        }
-    }
-}
 
 function logError(message: string, error: any): void {
-    const timestamp = new Date().toISOString();
-    const errorMessage = `[Extension ${timestamp}] ERROR: ${message}`;
+    // Only log critical errors to output channel
+    if (!outputChannel) return;
     
-    console.error(errorMessage);
-    if (outputChannel) {
-        outputChannel.appendLine(errorMessage);
-    }
+    const errorMessage = `ERROR: ${message}`;
+    outputChannel.appendLine(errorMessage);
     
     if (error instanceof Error) {
-        const details = `  Message: ${error.message}${DEBUG ? `\n  Stack: ${error.stack}` : ''}`;
-        console.error(details);
-        if (outputChannel) {
-            outputChannel.appendLine(details);
-        }
+        outputChannel.appendLine(`  Message: ${error.message}`);
     } else {
-        const details = `  Error object: ${JSON.stringify(error, null, 2)}`;
-        console.error(details);
-        if (outputChannel) {
-            outputChannel.appendLine(details);
-        }
+        outputChannel.appendLine(`  Error: ${String(error)}`);
     }
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    // Create output channel for logging
+    // Create output channel for errors only
     outputChannel = vscode.window.createOutputChannel('Kip Language Server');
-    if (DEBUG) {
-        outputChannel.show(true);
-    }
     context.subscriptions.push(outputChannel);
-    
-    log('Extension activation started');
 
     const kipSelector: vscode.DocumentSelector = { scheme: 'file', language: 'kip' };
 
@@ -173,52 +144,28 @@ export function activate(context: vscode.ExtensionContext) {
     // ============================================
     // Tüm özellikler LSP üzerinden çalışacak - fallback yok
     let lspClient: LanguageClientType | null = null;
-    let lspWorking = false;
     
     if (LanguageClient && TransportKind) {
-        log('LSP module available, initializing LSP...');
         try {
             lspClient = initializeLSP(context, kipSelector);
             
             if (lspClient) {
-                log('LSP client created successfully');
-                
                 // LSP client'ı context'e ekle (cleanup için)
                 context.subscriptions.push(lspClient);
                 
                 // LSP başlatma promise'ini yakala
                 const client = lspClient;
-                const startTime = Date.now();
-                
-                // Add event listeners for debugging
-                if (DEBUG) {
-                    client.onDidChangeState((e) => {
-                        log(`LSP client state changed: ${e.oldState} -> ${e.newState}`);
-                    });
-                }
                 
                 // Monitor for errors
                 (client as any).onError?.((error: Error, message: any, count: number) => {
                     logError(`LSP client error (count: ${count})`, error);
                 });
                 
-                // Add timeout to detect if start hangs
-                const startTimeout = setTimeout(() => {
-                    log(`WARNING: client.start() has been running for 10 seconds without completion`);
-                }, 10000);
-                
                 client.start().then(() => {
-                    clearTimeout(startTimeout);
-                    const duration = Date.now() - startTime;
-                    lspWorking = true;
-                    log(`LSP started successfully in ${duration}ms`);
-                    
                     // LSP provider'larını kayıt et
                     registerLSPProviders(context, kipSelector, client);
                 }).catch((err: unknown) => {
-                    const duration = Date.now() - startTime;
-                    lspWorking = false;
-                    logError(`LSP failed to start after ${duration}ms`, err);
+                    logError('LSP failed to start', err);
                     const errorMsg = err instanceof Error ? err.message : String(err);
                     vscode.window.showErrorMessage(`Kip LSP server failed to start: ${errorMsg}`);
                     outputChannel?.show(true);
@@ -240,8 +187,6 @@ export function activate(context: vscode.ExtensionContext) {
     // ============================================
     // Diagnostics LSP server tarafından sağlanacak
     // Fallback diagnostic provider yok - sadece LSP kullanılıyor
-    
-    log('Extension activation completed');
 }
 
 // updateProvidersWithLSP removed - all providers are LSP-only now
@@ -255,7 +200,6 @@ function registerLSPProviders(
     lspClient: LanguageClientType
 ): void {
     if (!SemanticProvider || !LanguageClient) {
-        if (DEBUG) console.warn('LSP providers not available');
         return;
     }
 
@@ -440,19 +384,7 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
         outputChannel: outputChannel
     };
     
-    // Set trace level
-    if (DEBUG) {
-        try {
-            const TraceEnum = require('vscode-languageclient/node').Trace;
-            if (TraceEnum && TraceEnum.Verbose !== undefined) {
-                clientOptions.trace = TraceEnum.Verbose;
-            } else if (TraceEnum && TraceEnum.Messages !== undefined) {
-                clientOptions.trace = TraceEnum.Messages;
-            }
-        } catch (e) {
-            // Ignore trace setting errors
-        }
-    }
+    // Trace disabled in production
 
     if (!LanguageClient) {
         logError('LanguageClient not available', null);
@@ -466,7 +398,6 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
             serverOptions,
             clientOptions
         );
-        log('LanguageClient instance created');
         return client;
     } catch (error) {
         logError('Failed to create LanguageClient', error);
