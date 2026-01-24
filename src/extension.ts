@@ -352,6 +352,8 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
 
     // Add error handler if available
     if (ErrorActionEnum && CloseActionEnum) {
+        const ErrorAction = ErrorActionEnum;
+        const CloseAction = CloseActionEnum;
         clientOptions.errorHandler = {
             error: (error: Error, message: any, count: number) => {
                 // Ignore "no handler" errors for optional LSP methods
@@ -360,11 +362,11 @@ function initializeLSP(context: vscode.ExtensionContext, kipSelector: vscode.Doc
                     error.message.includes('SetTrace') ||
                     error.message.includes('Initialized')
                 )) {
-                    return { action: ErrorActionEnum.Continue };
+                    return { action: ErrorAction.Continue };
                 }
-                return { action: ErrorActionEnum.Continue };
+                return { action: ErrorAction.Continue };
             },
-            closed: () => ({ action: CloseActionEnum.Restart })
+            closed: () => ({ action: CloseAction.Restart })
         };
     }
 
