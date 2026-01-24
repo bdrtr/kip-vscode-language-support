@@ -21,6 +21,7 @@ const fs = require('fs');
 
 const TEST_FILE = path.join(__dirname, '..', 'test-lsp-detailed.kip');
 const SERVER_PATH = path.join(__dirname, '..', 'out', 'server', 'server.js');
+const DEBUG = process.env.DEBUG === '1';
 
 // Test Kip kodu
 const TEST_CODE = `Bir (öğe listesi)
@@ -136,8 +137,13 @@ class LSPTester {
             
             const contentLengthMatch = header.match(/Content-Length:\s*(\d+)/i);
             if (!contentLengthMatch) {
-                // Skip malformed header
-                this.buffer = this.buffer.substring(bodyStart);
+                // Skip malformed header - remove up to next potential header
+                const nextHeader = this.buffer.indexOf('\r\n\r\n', bodyStart);
+                if (nextHeader === -1) {
+                    this.buffer = '';
+                    break;
+                }
+                this.buffer = this.buffer.substring(nextHeader);
                 continue;
             }
             
@@ -152,8 +158,10 @@ class LSPTester {
                     const message = JSON.parse(messageBody);
                     this.handleMessage(message);
                 } catch (e) {
-                    // Skip invalid JSON
-                    console.error(`Failed to parse message: ${e.message}`);
+                    // Skip invalid JSON - log and continue
+                    if (DEBUG) {
+                        console.error(`Failed to parse message (${messageBody.substring(0, 100)}...): ${e.message}`);
+                    }
                 }
             } else {
                 break; // Wait for more data
@@ -191,9 +199,16 @@ class LSPTester {
         });
     }
     
-    async request(method, params) {
+    async request(method, params, timeout = 5000) {
         const req = createRequest(method, params);
-        return this.send(req);
+        const promise = this.send(req);
+        
+        // Add timeout
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error(`Request timeout: ${method}`)), timeout);
+        });
+        
+        return Promise.race([promise, timeoutPromise]);
     }
     
     async notify(method, params) {
@@ -229,7 +244,7 @@ async function runTests() {
     const tester = new LSPTester(serverProcess);
     
     // Wait a bit for server to start
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     try {
         // Initialize
@@ -268,7 +283,7 @@ async function runTests() {
         }
         
         await tester.notify('initialized', {});
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Open document
         const testFileUri = `file://${TEST_FILE}`;
@@ -280,7 +295,7 @@ async function runTests() {
                 text: TEST_CODE
             }
         });
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 800));
         
         // Test Semantic Tokens (Full)
         console.log('\n📋 Test Suite: Semantic Tokens');
@@ -405,7 +420,10 @@ async function runTests() {
     } finally {
         // Shutdown
         try {
-            await tester.request('shutdown', {});
+            await Promise.race([
+                tester.request('shutdown', {}, 2000),
+                new Promise(resolve => setTimeout(resolve, 2000))
+            ]);
             await tester.notify('exit', {});
         } catch (e) {
             // Ignore shutdown errors
@@ -417,7 +435,12 @@ async function runTests() {
         }
         
         if (serverProcess && !serverProcess.killed) {
-            serverProcess.kill();
+            serverProcess.kill('SIGTERM');
+            setTimeout(() => {
+                if (!serverProcess.killed) {
+                    serverProcess.kill('SIGKILL');
+                }
+            }, 1000);
         }
     }
     
