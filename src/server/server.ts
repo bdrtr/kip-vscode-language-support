@@ -44,7 +44,9 @@ import {
     VariableDefinition, 
     FunctionCall, 
     VariableReference,
-    Expression
+    Expression,
+    ConditionalExpression,
+    PatternMatch
 } from './ast';
 
 // Logging helper - only log critical errors
@@ -297,16 +299,38 @@ function analyzeDocument(text: string): Omit<DocumentState, 'text' | 'diagnostic
         visitFunctionCall(node: FunctionCall) {
             variableRefs.add(node.functionName);
             // Recursively collect variable references from arguments
-            const visitExpr = (expr: Expression) => {
+            // Use a Set to track visited nodes to prevent infinite loops
+            const visited = new WeakSet<Expression>();
+            const visitExpr = (expr: Expression, depth: number = 0) => {
+                // Prevent infinite loops by tracking visited expressions and limiting depth
+                if (depth > 100 || visited.has(expr)) {
+                    return;
+                }
+                visited.add(expr);
+                
                 if (expr.type === 'VariableReference') {
                     variableRefs.add((expr as VariableReference).name);
                 } else if (expr.type === 'FunctionCall') {
                     const call = expr as FunctionCall;
                     variableRefs.add(call.functionName);
-                    call.arguments.forEach(visitExpr);
+                    call.arguments.forEach(arg => visitExpr(arg, depth + 1));
+                } else if (expr.type === 'ConditionalExpression') {
+                    const cond = expr as ConditionalExpression;
+                    visitExpr(cond.condition, depth + 1);
+                    visitExpr(cond.thenBranch, depth + 1);
+                    if (cond.elseBranch) {
+                        visitExpr(cond.elseBranch, depth + 1);
+                    }
+                } else if (expr.type === 'PatternMatch') {
+                    const match = expr as PatternMatch;
+                    visitExpr(match.value, depth + 1);
+                    match.patterns.forEach(pattern => {
+                        visitExpr(pattern.pattern, depth + 1);
+                        visitExpr(pattern.result, depth + 1);
+                    });
                 }
             };
-            node.arguments.forEach(visitExpr);
+            node.arguments.forEach(arg => visitExpr(arg, 0));
         },
         
         visitVariableReference(node: VariableReference) {
