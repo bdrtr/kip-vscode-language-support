@@ -1,7 +1,8 @@
 # Kip - Turkish Programming Language Extension
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/algorynth/kip-vscode-language-support/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/algorynth/kip-vscode-language-support/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/algorynth/kip-vscode-language-support)](https://github.com/algorynth/kip-vscode-language-support/releases/latest)
 
 > ⚠️ **Not an official extension** - This is a community-maintained extension for the Kip programming language.
 
@@ -11,14 +12,20 @@ Türkçe tabanlı programlama dili **Kip** için Visual Studio Code eklentisi.
 
 ### GitHub Releases'dan VSIX İndirme (Önerilen)
 
-Main branch'e her push'ta kod otomatik derlenir ve VSIX dosyası release'de yayınlanır:
+Main branch'e her push'ta kod otomatik derlenir ve VSIX dosyası GitHub Actions artifact olarak yüklenir:
 
 1. **[GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases/latest)** sayfasına gidin
+   - Veya direkt link: [Latest Release](https://github.com/algorynth/kip-vscode-language-support/releases/latest)
 2. **Assets** bölümünden `kip-language-X.X.X.vsix` dosyasını indirin
 3. VS Code'da yükleyin:
    ```bash
    code --install-extension kip-language-X.X.X.vsix
    ```
+
+**Alternatif:** GitHub Actions artifact'ından indirme:
+1. Repository'nin **Actions** sekmesine gidin
+2. En son başarılı workflow run'ına tıklayın
+3. **Artifacts** bölümünden `kip-language-extension` artifact'ını indirin
 
 Veya VS Code içinden:
 1. `Ctrl+Shift+P` tuşlarına basın
@@ -206,6 +213,8 @@ MIT License - detaylar için [LICENSE](LICENSE) dosyasına bakın.
 
 ## 🔗 Bağlantılar
 
+- **Latest Release:** [GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases/latest)
+- **All Releases:** [GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases)
 - **Kip Dili Repo:** [github.com/kip-dili/kip](https://github.com/kip-dili/kip)
 - **Issues:** [GitHub Issues](https://github.com/algorynth/kip-vscode-language-support/issues)
 
