@@ -3,8 +3,6 @@ name: Build Extension
 on:
   push:
     branches: [ main, master ]
-    tags:
-      - 'v*'
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -12,14 +10,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
       
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -29,113 +23,19 @@ jobs:
         
     - name: Install dependencies
       run: npm ci
-        
-    - name: Run dependency check
-      run: npm run check
-        
+      
     - name: Compile TypeScript
       run: npm run compile
-        
+      
     - name: Install vsce
       run: npm install -g @vscode/vsce
       
-    - name: Get version from package.json
-      id: version
-      run: |
-        VERSION=$(node -p "require('./package.json').version")
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "VSIX version: $VERSION"
-      
     - name: Package extension
-      run: |
-        vsce package --out "kip-language-${{ steps.version.outputs.version }}.vsix"
-        echo "VSIX created: kip-language-${{ steps.version.outputs.version }}.vsix"
-      
-    - name: Validate VSIX
-      run: npm run validate "kip-language-${{ steps.version.outputs.version }}.vsix"
+      run: npm run package
       
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
       with:
-        name: kip-language-${{ steps.version.outputs.version }}
+        name: kip-language-extension
         path: '*.vsix'
-        retention-days: 90
-    
-    # Tag push veya main branch push'ta release oluştur
-    - name: Check if release exists
-      id: check_release
-      if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-      run: |
-        VERSION="${{ steps.version.outputs.version }}"
-        # Release var mı kontrol et
-        if gh release view "v${VERSION}" &>/dev/null; then
-          echo "exists=true" >> $GITHUB_OUTPUT
-          echo "Release v${VERSION} already exists"
-        else
-          echo "exists=false" >> $GITHUB_OUTPUT
-          echo "Release v${VERSION} does not exist"
-        fi
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Create Release
-      if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && steps.check_release.outputs.exists == 'false'
-      uses: softprops/action-gh-release@v1
-      with:
-        files: '*.vsix'
-        tag_name: v${{ steps.version.outputs.version }}
-        name: Kip Language Extension v${{ steps.version.outputs.version }}
-        generate_release_notes: true
-        draft: false
-        prerelease: false
-        body: |
-          ## 📦 Kip Language Extension v${{ steps.version.outputs.version }}
-          
-          Bu release için VSIX dosyası otomatik olarak derlenmiş ve yayınlanmıştır.
-          
-          ### 📥 Kurulum
-          
-          **VS Code Marketplace:**
-          ```bash
-          code --install-extension algorynth.kip-language
-          ```
-          
-          **VSIX Dosyası ile:**
-          1. Aşağıdaki `kip-language-${{ steps.version.outputs.version }}.vsix` dosyasını indirin
-          2. VS Code'da `Ctrl+Shift+P` (veya `Cmd+Shift+P` macOS'ta) tuşlarına basın
-          3. "Extensions: Install from VSIX..." komutunu çalıştırın
-          4. İndirdiğiniz VSIX dosyasını seçin
-          
-          ### ✨ Bu Versiyondaki Değişiklikler
-          
-          Detaylar için [CHANGELOG.md](CHANGELOG.md) dosyasına bakın.
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    # Mevcut release varsa VSIX'i güncelle
-    - name: Update existing release
-      if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && steps.check_release.outputs.exists == 'true'
-      run: |
-        VERSION="${{ steps.version.outputs.version }}"
-        echo "Updating release v${VERSION} with new VSIX..."
-        gh release upload "v${VERSION}" "kip-language-${VERSION}.vsix" --clobber
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Comment PR with VSIX download
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          const vsixFiles = fs.readdirSync('.').filter(f => f.endsWith('.vsix'));
-          if (vsixFiles.length > 0) {
-            const vsixFile = vsixFiles[0];
-            const fileSize = (fs.statSync(vsixFile).size / 1024 / 1024).toFixed(2);
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## ✅ Extension Build Başarılı!\n\n📦 **VSIX Dosyası:** \`${vsixFile}\` (${fileSize} MB)\n\nArtifacts sekmesinden indirebilirsiniz.`
-            });
-          }
+        retention-days: 7

@@ -5,25 +5,49 @@ import * as fs from 'fs';
 
 export class KipRunner {
     private outputChannel: vscode.OutputChannel;
+    private context: vscode.ExtensionContext;
 
-    constructor() {
+    constructor(context: vscode.ExtensionContext) {
+        this.context = context;
         this.outputChannel = vscode.window.createOutputChannel('Kip');
     }
 
     async runFile(document: vscode.TextDocument): Promise<void> {
-        // Dosyayı kaydet
         await document.save();
-
         const filePath = document.fileName;
 
-        // Kip executable'ı bul
-        const kipPath = await this.findKipExecutable();
-        const command = kipPath ? `"${kipPath}" --exec "${filePath}"` : `kip --exec "${filePath}"`;
+        let kipPath = await this.findKipExecutable();
+        
+        if (!kipPath) {
+            const installAction = await vscode.window.showInformationMessage(
+                'Kip derleyicisi bulunamadı. Otomatik kurulum yapmak ister misiniz?',
+                'Kur',
+                'İptal'
+            );
+            
+            if (installAction === 'Kur') {
+                kipPath = await this.runInstallationScript();
+            }
+            
+            if (!kipPath) {
+                const action = await vscode.window.showErrorMessage(
+                    'Kip derleyicisi bulunamadı. Kip dosyalarını çalıştırmak için önce Kip derleyicisini kurmanız gerekiyor.',
+                    'Kurulum Rehberi',
+                    'Ayarları Aç'
+                );
+                
+                if (action === 'Kurulum Rehberi') {
+                    this.showInstallationGuide();
+                } else if (action === 'Ayarları Aç') {
+                    await vscode.commands.executeCommand('workbench.action.openSettings', 'kip.compilerPath');
+                }
+                return;
+            }
+        }
+        
+        const command = `"${kipPath}" --exec "${filePath}"`;
 
-        // Terminal kullanmayı dene, başarısız olursa Output Channel kullan
         try {
-            // Output channel yerine Terminal kullan (Input desteği için)
-            // Mevcut bir terminal varsa onu kullan veya yeni oluştur
             let terminal = vscode.window.terminals.find(t => t.name === 'Kip Run');
             if (!terminal) {
                 terminal = vscode.window.createTerminal({
@@ -35,20 +59,16 @@ export class KipRunner {
             terminal.show();
             terminal.sendText(`echo 'Running: ${path.basename(filePath)}...'`);
             terminal.sendText(command);
-            
-            console.log('✅ Kip program started in terminal');
         } catch (terminalError) {
-            // Terminal oluşturulamazsa Output Channel kullan
-            console.warn('⚠️ Terminal creation failed, using Output Channel:', terminalError);
+            console.warn('Terminal creation failed, using Output Channel:', terminalError);
             
             this.outputChannel.clear();
             this.outputChannel.appendLine(`Running: ${path.basename(filePath)}...`);
             this.outputChannel.appendLine('');
             this.outputChannel.show(true);
 
-            // Child process ile çalıştır
             try {
-                await this.executeKipWithStreaming(kipPath || 'kip', filePath);
+                await this.executeKipWithStreaming(kipPath, filePath);
             } catch (execError) {
                 const errorMsg = execError instanceof Error ? execError.message : String(execError);
                 this.outputChannel.appendLine(`❌ Error: ${errorMsg}`);
@@ -58,39 +78,67 @@ export class KipRunner {
     }
 
     async findKipExecutable(): Promise<string | null> {
-        // 1. Önce konfigürasyona bak (gelecek özellik)
-        // const configPath = vscode.workspace.getConfiguration('kip').get<string>('compilerPath');
-        // if (configPath && fs.existsSync(configPath)) return configPath;
+        const configPath = vscode.workspace.getConfiguration('kip').get<string>('compilerPath');
+        if (configPath?.trim()) {
+            const resolvedPath = path.isAbsolute(configPath) 
+                ? configPath 
+                : path.resolve(configPath);
+            if (fs.existsSync(resolvedPath)) {
+                return resolvedPath;
+            }
+            console.warn(`Configured kip.compilerPath not found: ${resolvedPath}`);
+        }
 
-        // 2. Varsayılan kurulum yolunu kontrol et (~/.local/bin/kip)
         const homeDir = process.env.HOME || process.env.USERPROFILE;
         if (homeDir) {
             const defaultPath = path.join(homeDir, '.local', 'bin', 'kip');
-            if (fs.existsSync(defaultPath)) {
-                return defaultPath;
+            const defaultPathWin = path.join(homeDir, '.local', 'bin', 'kip.exe');
+            
+            if (process.platform === 'win32') {
+                if (fs.existsSync(defaultPathWin)) {
+                    return defaultPathWin;
+                }
+                if (fs.existsSync(defaultPath)) {
+                    return defaultPath;
+                }
+            } else {
+                if (fs.existsSync(defaultPath)) {
+                    return defaultPath;
+                }
             }
         }
 
-        // 3. Sistem PATH'ini kontrol et
-        return new Promise((resolve) => {
-            child_process.exec('which kip', (error, stdout) => {
-                if (!error && stdout && stdout.trim().length > 0) {
+        const pathResult = await new Promise<string | null>((resolve) => {
+            const command = process.platform === 'win32' ? 'where kip' : 'which kip';
+            child_process.exec(command, (error, stdout) => {
+                if (!error && stdout?.trim()) {
                     resolve(stdout.trim());
                 } else {
-                    resolve(null);
+                    // Windows'ta .exe uzantısı ile de dene
+                    if (process.platform === 'win32') {
+                        child_process.exec('where kip.exe', (error2, stdout2) => {
+                            if (!error2 && stdout2?.trim()) {
+                                resolve(stdout2.trim());
+                            } else {
+                                resolve(null);
+                            }
+                        });
+                    } else {
+                        resolve(null);
+                    }
                 }
             });
         });
+
+        return pathResult;
     }
 
     private async executeKipWithStreaming(kipPath: string, filePath: string): Promise<void> {
         return new Promise((resolve, reject) => {
-            const args = ['--exec', filePath];
-            const proc = child_process.spawn(kipPath, args, {
+            const proc = child_process.spawn(kipPath, ['--exec', filePath], {
                 cwd: path.dirname(filePath)
             });
 
-            // Kip REPL'ın asılı kalmaması için stdin'i kapat (EOF gönder)
             proc.stdin.end();
 
             proc.stdout.on('data', (data) => {
@@ -117,136 +165,139 @@ export class KipRunner {
         });
     }
 
-    private executeKip(kipPath: string, filePath: string): Promise<{ stdout: string, stderr: string, exitCode: number }> {
-        return new Promise((resolve) => {
-            const process = child_process.spawn(kipPath, [filePath], {
-                cwd: path.dirname(filePath)
+    private getPlatformInstallScript(): { script: string; command: string } | null {
+        const platform = process.platform;
+        const scriptsDir = this.context.asAbsolutePath('scripts');
+
+        if (platform === 'win32') {
+            const ps1Path = path.join(scriptsDir, 'install.ps1');
+            const batPath = path.join(scriptsDir, 'install.bat');
+            
+            if (fs.existsSync(ps1Path)) {
+                return {
+                    script: ps1Path,
+                    command: `powershell -ExecutionPolicy Bypass -File "${ps1Path}"`
+                };
+            } else if (fs.existsSync(batPath)) {
+                return {
+                    script: batPath,
+                    command: `cmd /c "${batPath}"`
+                };
+            }
+        } else {
+            const shPath = path.join(scriptsDir, 'install.sh');
+            if (fs.existsSync(shPath)) {
+                try {
+                    fs.chmodSync(shPath, '755');
+                } catch (e) {
+                    console.warn('Failed to chmod install.sh:', e);
+                }
+                return {
+                    script: shPath,
+                    command: `"${shPath}"`
+                };
+            }
+        }
+
+        return null;
+    }
+
+    private async runInstallationScript(): Promise<string | null> {
+        const scriptInfo = this.getPlatformInstallScript();
+        
+        if (!scriptInfo) {
+            const platformText = process.platform === 'win32' ? 'Windows' 
+                : process.platform === 'darwin' ? 'macOS' 
+                : 'Linux';
+            
+            await vscode.window.showErrorMessage(
+                `${platformText} için kurulum script'i bulunamadı. Lütfen manuel olarak kurun.`,
+                'Kurulum Rehberi'
+            ).then(action => {
+                if (action === 'Kurulum Rehberi') {
+                    this.showInstallationGuide();
+                }
             });
+            return null;
+        }
 
-            // Kip REPL'ın asılı kalmaması için stdin'i kapat
-            process.stdin.end();
-
-            let stdout = '';
-            let stderr = '';
-
-            process.stdout.on('data', (data) => {
-                stdout += data.toString();
-            });
-
-            process.stderr.on('data', (data) => {
-                stderr += data.toString();
-            });
-
-            process.on('close', (code) => {
-                resolve({
-                    stdout,
-                    stderr,
-                    exitCode: code || 0
-                });
-            });
-
-            process.on('error', (error) => {
-                resolve({
-                    stdout,
-                    stderr: error.message,
-                    exitCode: 1
-                });
-            });
+        const terminal = vscode.window.createTerminal({
+            name: 'Kip Installation',
+            hideFromUser: false
         });
+
+        terminal.show();
+
+        let installationResult: string | null = null;
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Kip Kurulumu Çalışıyor',
+            cancellable: false
+        }, async (progress) => {
+            try {
+                progress.report({ increment: 0, message: 'Kurulum script\'i başlatılıyor...' });
+                this.outputChannel.appendLine(`🔧 Kurulum script'i çalıştırılıyor: ${scriptInfo.script}`);
+                
+                terminal.sendText(scriptInfo.command);
+                
+                if (process.platform !== 'win32') {
+                    vscode.window.showInformationMessage(
+                        'Kurulum başlatıldı. Terminal\'de şifreniz istenebilir (Foma ve Stack kurulumu için).'
+                    );
+                } else {
+                    vscode.window.showInformationMessage(
+                        'Kurulum başlatıldı. Terminal penceresini kontrol edin.'
+                    );
+                }
+
+                progress.report({ increment: 50, message: 'Kurulum devam ediyor...' });
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                const kipPath = await this.findKipExecutable();
+                if (kipPath) {
+                    installationResult = kipPath;
+                    progress.report({ increment: 100, message: 'Kurulum tamamlandı!' });
+                    this.outputChannel.appendLine(`✅ Kurulum başarılı! Binary bulundu: ${kipPath}`);
+                } else {
+                    progress.report({ increment: 100, message: 'Kurulum devam ediyor...' });
+                    this.outputChannel.appendLine('ℹ️ Kurulum devam ediyor. Lütfen terminal penceresini kontrol edin.');
+                    this.outputChannel.appendLine('ℹ️ Kurulum tamamlandığında VS Code\'u yeniden başlatın.');
+                }
+            } catch (error: any) {
+                const errorMsg = error?.message || String(error);
+                console.error(`Installation script failed: ${errorMsg}`);
+                this.outputChannel.appendLine(`❌ Kurulum hatası: ${errorMsg}`);
+                this.outputChannel.show(true);
+                
+                await vscode.window.showErrorMessage(
+                    `Kurulum script'i başarısız: ${errorMsg}`,
+                    'Kurulum Rehberi'
+                ).then(action => {
+                    if (action === 'Kurulum Rehberi') {
+                        this.showInstallationGuide();
+                    }
+                });
+            }
+        });
+
+        return installationResult;
     }
 
     private showInstallationGuide() {
-        this.outputChannel.appendLine('❌ Kip compiler not found!');
+        this.outputChannel.appendLine('❌ Kip derleyicisi bulunamadı!');
         this.outputChannel.appendLine('');
-        this.outputChannel.appendLine('📦 Installation Options:');
+        this.outputChannel.appendLine('📦 Kurulum Seçenekleri:');
         this.outputChannel.appendLine('');
-        this.outputChannel.appendLine('Option 1: Automatic Installation');
-        this.outputChannel.appendLine('  cd <kip-lang-directory>');
-        this.outputChannel.appendLine('  ./install.sh');
+        this.outputChannel.appendLine('Seçenek 1: Otomatik Kurulum');
+        this.outputChannel.appendLine('  Extension\'ın "Kur" butonuna tıklayın');
         this.outputChannel.appendLine('');
-        this.outputChannel.appendLine('Option 2: Manual Installation');
+        this.outputChannel.appendLine('Seçenek 2: Manuel Kurulum');
         this.outputChannel.appendLine('  sudo apt install haskell-stack');
         this.outputChannel.appendLine('  cd <kip-lang-directory>');
         this.outputChannel.appendLine('  stack install');
         this.outputChannel.appendLine('  export PATH="$HOME/.local/bin:$PATH"');
         this.outputChannel.appendLine('');
-        this.outputChannel.appendLine('📚 See KIP-INSTALLATION.md for detailed instructions');
-
-        const action = vscode.window.showErrorMessage(
-            'Kip compiler not found. Would you like to see installation instructions?',
-            'Open Guide',
-            'Install Now'
-        );
-
-        action.then(choice => {
-            if (choice === 'Open Guide') {
-                const guideUri = vscode.Uri.file(
-                    path.join(__dirname, '..', 'KIP-INSTALLATION.md')
-                );
-                vscode.commands.executeCommand('markdown.showPreview', guideUri);
-            } else if (choice === 'Install Now') {
-                this.startInstallation();
-            }
-        });
-    }
-
-    private startInstallation() {
-        const terminal = vscode.window.createTerminal('Kip Installation');
-        terminal.show();
-
-        // Workspace'den kip-lang dizinini bul
-        let kipLangPath: string | null = null;
-        
-        if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
-            // Workspace'de kip-lang dizinini ara
-            for (const folder of vscode.workspace.workspaceFolders) {
-                const potentialPath = path.join(folder.uri.fsPath, 'kip-lang');
-                if (fs.existsSync(potentialPath)) {
-                    kipLangPath = potentialPath;
-                    break;
-                }
-                // Bir üst dizinde de ara
-                const parentPath = path.join(path.dirname(folder.uri.fsPath), 'kip-lang');
-                if (fs.existsSync(parentPath)) {
-                    kipLangPath = parentPath;
-                    break;
-                }
-            }
-        }
-
-        // Bulunamazsa kullanıcıdan sor
-        if (!kipLangPath) {
-            vscode.window.showInputBox({
-                prompt: 'Kip-lang dizininin yolunu girin',
-                placeHolder: '/path/to/kip-lang',
-                validateInput: (value) => {
-                    if (!value || !fs.existsSync(value)) {
-                        return 'Geçerli bir dizin yolu girin';
-                    }
-                    return null;
-                }
-            }).then(selectedPath => {
-                if (selectedPath) {
-                    this.runInstallation(terminal, selectedPath);
-                }
-            });
-            return;
-        }
-
-        this.runInstallation(terminal, kipLangPath);
-    }
-
-    private runInstallation(terminal: vscode.Terminal, kipLangPath: string) {
-        terminal.sendText(`cd "${kipLangPath}"`);
-        terminal.sendText("echo '🚀 Starting Automated Installation for VS Code...'");
-        terminal.sendText("echo 'ℹ️ This will require your password for dependencies (foma).'");
-
-        // Tek komutla her şeyi kur (chmod ekle)
-        terminal.sendText("chmod +x ./install.sh && ./install.sh && stack install && echo '✅ Installation Completed! You can run Kip code now.'");
-
-        vscode.window.showInformationMessage(
-            'Installation started. Please enter your password in the terminal if asked.'
-        );
+        this.outputChannel.show(true);
     }
 
     dispose() {
