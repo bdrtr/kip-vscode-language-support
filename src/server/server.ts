@@ -616,7 +616,8 @@ connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] =
     }
 });
 
-// Semantic tokens handler
+// Semantic tokens handler - follows original Kip LSP logic
+// Original: extractSemanticTokens processes statements and finds all occurrences of identifiers
 connection.onRequest('textDocument/semanticTokens/full', (params: SemanticTokensParams): SemanticTokens => {
     try {
         const document = documents.get(params.textDocument.uri);
@@ -630,90 +631,124 @@ connection.onRequest('textDocument/semanticTokens/full', (params: SemanticTokens
         let prevLine = 0;
         let prevChar = 0;
         
-        const tokenPattern = /\d+(?:'?\p{L}+)?|\p{L}+(?:-\p{L}+)*|[(),.]|"[^"]*"/gu;
-        let match;
+        // Find all occurrences of identifiers (like original findAllOccurrences)
+        // Process in order: types, functions, variables, keywords
+        const allIdentifiers: Array<{ name: string; type: number; positions: Array<{ line: number; char: number; length: number }> }> = [];
         
-        const allTokens: Array<{ token: string; start: number; line: number; char: number }> = [];
-        while ((match = tokenPattern.exec(text)) !== null) {
-            const token = match[0];
+        // Collect all type occurrences (including multi-word types)
+        // Process multi-word types first to avoid partial matches
+        const sortedTypes = Array.from(state.types).sort((a, b) => b.length - a.length); // Longer first
+        for (const typeName of sortedTypes) {
+            const positions = findAllOccurrences(text, typeName);
+            if (positions.length > 0) {
+                allIdentifiers.push({ name: typeName, type: 5, positions });
+            }
+        }
+        
+        // Also handle type phrase parts (e.g., "öğe" from "öğe listesi")
+        // But only if they're not already covered by full type name
+        for (const [typeWord, fullType] of state.typePhrases.entries()) {
+            // Only process if the full type wasn't found or if this is a grammatical variation
+            if (!state.types.has(typeWord)) {
+                // Find occurrences that might be grammatical variations
+                const positions = findAllOccurrences(text, typeWord);
+                // Filter to only include positions that aren't already covered by full type
+                const filteredPositions = positions.filter(pos => {
+                    // Check if this position is already covered by a full type occurrence
+                    return !allIdentifiers.some(ident => 
+                        ident.type === 5 && ident.positions.some(p => 
+                            p.line === pos.line && 
+                            Math.abs(p.char - pos.char) < 5 // Close positions
+                        )
+                    );
+                });
+                if (filteredPositions.length > 0) {
+                    allIdentifiers.push({ name: typeWord, type: 5, positions: filteredPositions });
+                }
+            }
+        }
+        
+        // Collect all function occurrences
+        for (const funcName of state.functions) {
+            const positions = findAllOccurrences(text, funcName);
+            if (positions.length > 0) {
+                allIdentifiers.push({ name: funcName, type: 1, positions });
+            }
+        }
+        
+        // Collect all variable occurrences (definitions and references)
+        const allVars = new Set([...state.variables, ...state.variableRefs]);
+        for (const varName of allVars) {
+            // Skip if already marked as type or function
+            if (!state.types.has(varName) && !state.functions.has(varName)) {
+                const positions = findAllOccurrences(text, varName);
+                if (positions.length > 0) {
+                    allIdentifiers.push({ name: varName, type: 2, positions });
+                }
+            }
+        }
+        
+        // Collect keyword occurrences
+        for (const keyword of state.keywords) {
+            const positions = findAllOccurrences(text, keyword);
+            if (positions.length > 0) {
+                allIdentifiers.push({ name: keyword, type: 0, positions });
+            }
+        }
+        
+        // Collect string and number literals
+        const stringPattern = /"[^"]*"/g;
+        let match;
+        while ((match = stringPattern.exec(text)) !== null) {
             const start = match.index;
             const textBefore = text.substring(0, start);
             const linesBefore = textBefore.split('\n');
             const line = linesBefore.length - 1;
             const char = linesBefore[linesBefore.length - 1].length;
-            allTokens.push({ token, start, line, char });
+            allIdentifiers.push({
+                name: match[0],
+                type: 3,
+                positions: [{ line, char, length: match[0].length }]
+            });
         }
         
-        for (let i = 0; i < allTokens.length; i++) {
-            const token = allTokens[i].token;
-            const start = allTokens[i].start;
+        const numberPattern = /\d+(?:'?\p{L}+)?/gu;
+        while ((match = numberPattern.exec(text)) !== null) {
+            const start = match.index;
             const textBefore = text.substring(0, start);
             const linesBefore = textBefore.split('\n');
             const line = linesBefore.length - 1;
             const char = linesBefore[linesBefore.length - 1].length;
-            
-            let tokenType: number | null = null;
-            
-            if (token.startsWith('"')) {
-                tokenType = 3; // string
-            } else if (/^\d/.test(token)) {
-                tokenType = 4; // number
-            } else if (state.keywords.has(token)) {
-                tokenType = 0; // keyword
-            } else {
-                let foundType = false;
-                
-                // Check 2-word phrases
-                if (i + 1 < allTokens.length) {
-                    const twoWord = `${token} ${allTokens[i + 1].token}`;
-                    if (state.types.has(twoWord)) {
-                        tokenType = 5; // type
-                        foundType = true;
-                    }
-                }
-                
-                // Check 3-word phrases
-                if (!foundType && i + 2 < allTokens.length) {
-                    const threeWord = `${token} ${allTokens[i + 1].token} ${allTokens[i + 2].token}`;
-                    if (state.types.has(threeWord)) {
-                        tokenType = 5; // type
-                        foundType = true;
-                    }
-                }
-                
-                // Check if this word is part of a type
-                if (!foundType) {
-                    for (const [typeWord, fullType] of state.typePhrases.entries()) {
-                        if (token.includes(typeWord) || typeWord.includes(token)) {
-                            const baseWord = typeWord.split(' ')[0];
-                            if (token.startsWith(baseWord) || baseWord.startsWith(token.substring(0, 3))) {
-                                tokenType = 5; // type
-                                foundType = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                
-                // Check single word types
-                if (!foundType && state.types.has(token)) {
-                    tokenType = 5; // type
-                } else if (!foundType && state.functions.has(token)) {
-                    tokenType = 1; // function
-                } else if (!foundType && (state.variables.has(token) || state.variableRefs.has(token))) {
-                    tokenType = 2; // variable
-                }
+            allIdentifiers.push({
+                name: match[0],
+                type: 4,
+                positions: [{ line, char, length: match[0].length }]
+            });
+        }
+        
+        // Sort all positions by line and character
+        const allPositions: Array<{ line: number; char: number; length: number; type: number }> = [];
+        for (const ident of allIdentifiers) {
+            for (const pos of ident.positions) {
+                allPositions.push({ ...pos, type: ident.type });
             }
+        }
+        
+        // Sort by position (line, then char)
+        allPositions.sort((a, b) => {
+            if (a.line !== b.line) return a.line - b.line;
+            return a.char - b.char;
+        });
+        
+        // Build semantic tokens array (delta encoding)
+        for (const pos of allPositions) {
+            const deltaLine = pos.line - prevLine;
+            const deltaChar = deltaLine === 0 ? pos.char - prevChar : pos.char;
             
-            if (tokenType !== null) {
-                const deltaLine = line - prevLine;
-                const deltaChar = deltaLine === 0 ? char - prevChar : char;
-                
-                tokens.push(deltaLine, deltaChar, token.length, tokenType, 0);
-                
-                prevLine = line;
-                prevChar = char;
-            }
+            tokens.push(deltaLine, deltaChar, pos.length, pos.type, 0);
+            
+            prevLine = pos.line;
+            prevChar = pos.char;
         }
         
         return { data: tokens };
@@ -723,7 +758,29 @@ connection.onRequest('textDocument/semanticTokens/full', (params: SemanticTokens
     }
 });
 
-// Ensure semantic tokens are returned correctly
+// Helper function to find all occurrences of a string in text (like original findAllOccurrences)
+function findAllOccurrences(text: string, needle: string): Array<{ line: number; char: number; length: number }> {
+    const positions: Array<{ line: number; char: number; length: number }> = [];
+    let offset = 0;
+    
+    while (true) {
+        const index = text.indexOf(needle, offset);
+        if (index === -1) break;
+        
+        const textBefore = text.substring(0, index);
+        const linesBefore = textBefore.split('\n');
+        const line = linesBefore.length - 1;
+        const char = linesBefore[linesBefore.length - 1].length;
+        
+        positions.push({ line, char, length: needle.length });
+        
+        offset = index + needle.length;
+    }
+    
+    return positions;
+}
+
+// Semantic tokens range handler - uses same logic as full but filters by range
 connection.onRequest('textDocument/semanticTokens/range', (params: SemanticTokensRangeParams): SemanticTokens => {
     try {
         const document = documents.get(params.textDocument.uri);
@@ -736,115 +793,107 @@ connection.onRequest('textDocument/semanticTokens/range', (params: SemanticToken
             return { data: [] };
         }
         
-        // For range requests, return full tokens (can be optimized later)
-        const fullResult = connection.sendRequest('textDocument/semanticTokens/full', {
-            textDocument: { uri: params.textDocument.uri }
-        });
-        
-        // Actually, we need to handle this synchronously
-        // So we'll just call the same logic
         const text = document.getText();
+        const range = params.range;
         const tokens: number[] = [];
         let prevLine = 0;
         let prevChar = 0;
         
-        const tokenPattern = /\d+(?:'?\p{L}+)?|\p{L}+(?:-\p{L}+)*|[(),.]|"[^"]*"/gu;
-        let match;
+        // Find all occurrences (same as full)
+        const allIdentifiers: Array<{ name: string; type: number; positions: Array<{ line: number; char: number; length: number }> }> = [];
         
-        const allTokens: Array<{ token: string; start: number; line: number; char: number }> = [];
-        while ((match = tokenPattern.exec(text)) !== null) {
-            const token = match[0];
+        for (const typeName of state.types) {
+            const positions = findAllOccurrences(text, typeName).filter(pos => 
+                isPositionInRange(pos.line, pos.char, pos.length, range)
+            );
+            if (positions.length > 0) {
+                allIdentifiers.push({ name: typeName, type: 5, positions });
+            }
+        }
+        
+        for (const funcName of state.functions) {
+            const positions = findAllOccurrences(text, funcName).filter(pos => 
+                isPositionInRange(pos.line, pos.char, pos.length, range)
+            );
+            if (positions.length > 0) {
+                allIdentifiers.push({ name: funcName, type: 1, positions });
+            }
+        }
+        
+        const allVars = new Set([...state.variables, ...state.variableRefs]);
+        for (const varName of allVars) {
+            if (!state.types.has(varName) && !state.functions.has(varName)) {
+                const positions = findAllOccurrences(text, varName).filter(pos => 
+                    isPositionInRange(pos.line, pos.char, pos.length, range)
+                );
+                if (positions.length > 0) {
+                    allIdentifiers.push({ name: varName, type: 2, positions });
+                }
+            }
+        }
+        
+        for (const keyword of state.keywords) {
+            const positions = findAllOccurrences(text, keyword).filter(pos => 
+                isPositionInRange(pos.line, pos.char, pos.length, range)
+            );
+            if (positions.length > 0) {
+                allIdentifiers.push({ name: keyword, type: 0, positions });
+            }
+        }
+        
+        const stringPattern = /"[^"]*"/g;
+        let match;
+        while ((match = stringPattern.exec(text)) !== null) {
             const start = match.index;
             const textBefore = text.substring(0, start);
             const linesBefore = textBefore.split('\n');
             const line = linesBefore.length - 1;
             const char = linesBefore[linesBefore.length - 1].length;
-            allTokens.push({ token, start, line, char });
+            if (isPositionInRange(line, char, match[0].length, range)) {
+                allIdentifiers.push({
+                    name: match[0],
+                    type: 3,
+                    positions: [{ line, char, length: match[0].length }]
+                });
+            }
         }
         
-        const range = params.range;
-        
-        for (let i = 0; i < allTokens.length; i++) {
-            const token = allTokens[i].token;
-            const start = allTokens[i].start;
+        const numberPattern = /\d+(?:'?\p{L}+)?/gu;
+        while ((match = numberPattern.exec(text)) !== null) {
+            const start = match.index;
             const textBefore = text.substring(0, start);
             const linesBefore = textBefore.split('\n');
             const line = linesBefore.length - 1;
             const char = linesBefore[linesBefore.length - 1].length;
+            if (isPositionInRange(line, char, match[0].length, range)) {
+                allIdentifiers.push({
+                    name: match[0],
+                    type: 4,
+                    positions: [{ line, char, length: match[0].length }]
+                });
+            }
+        }
+        
+        const allPositions: Array<{ line: number; char: number; length: number; type: number }> = [];
+        for (const ident of allIdentifiers) {
+            for (const pos of ident.positions) {
+                allPositions.push({ ...pos, type: ident.type });
+            }
+        }
+        
+        allPositions.sort((a, b) => {
+            if (a.line !== b.line) return a.line - b.line;
+            return a.char - b.char;
+        });
+        
+        for (const pos of allPositions) {
+            const deltaLine = pos.line - prevLine;
+            const deltaChar = deltaLine === 0 ? pos.char - prevChar : pos.char;
             
-            // Check if token is within requested range
-            if (line < range.start.line || line > range.end.line) {
-                continue;
-            }
-            if (line === range.start.line && char < range.start.character) {
-                continue;
-            }
-            if (line === range.end.line && char + token.length > range.end.character) {
-                continue;
-            }
+            tokens.push(deltaLine, deltaChar, pos.length, pos.type, 0);
             
-            let tokenType: number | null = null;
-            
-            if (token.startsWith('"')) {
-                tokenType = 3; // string
-            } else if (/^\d/.test(token)) {
-                tokenType = 4; // number
-            } else if (state.keywords.has(token)) {
-                tokenType = 0; // keyword
-            } else {
-                let foundType = false;
-                
-                // Check 2-word phrases
-                if (i + 1 < allTokens.length) {
-                    const twoWord = `${token} ${allTokens[i + 1].token}`;
-                    if (state.types.has(twoWord)) {
-                        tokenType = 5; // type
-                        foundType = true;
-                    }
-                }
-                
-                // Check 3-word phrases
-                if (!foundType && i + 2 < allTokens.length) {
-                    const threeWord = `${token} ${allTokens[i + 1].token} ${allTokens[i + 2].token}`;
-                    if (state.types.has(threeWord)) {
-                        tokenType = 5; // type
-                        foundType = true;
-                    }
-                }
-                
-                // Check if this word is part of a type
-                if (!foundType) {
-                    for (const [typeWord, fullType] of state.typePhrases.entries()) {
-                        if (token.includes(typeWord) || typeWord.includes(token)) {
-                            const baseWord = typeWord.split(' ')[0];
-                            if (token.startsWith(baseWord) || baseWord.startsWith(token.substring(0, 3))) {
-                                tokenType = 5; // type
-                                foundType = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                
-                // Check single word types
-                if (!foundType && state.types.has(token)) {
-                    tokenType = 5; // type
-                } else if (!foundType && state.functions.has(token)) {
-                    tokenType = 1; // function
-                } else if (!foundType && (state.variables.has(token) || state.variableRefs.has(token))) {
-                    tokenType = 2; // variable (definition or reference)
-                }
-            }
-            
-            if (tokenType !== null) {
-                const deltaLine = line - prevLine;
-                const deltaChar = deltaLine === 0 ? char - prevChar : char;
-                
-                tokens.push(deltaLine, deltaChar, token.length, tokenType, 0);
-                
-                prevLine = line;
-                prevChar = char;
-            }
+            prevLine = pos.line;
+            prevChar = pos.char;
         }
         
         return { data: tokens };
@@ -853,6 +902,20 @@ connection.onRequest('textDocument/semanticTokens/range', (params: SemanticToken
         return { data: [] };
     }
 });
+
+// Helper to check if position is within range
+function isPositionInRange(line: number, char: number, length: number, range: Range): boolean {
+    if (line < range.start.line || line > range.end.line) {
+        return false;
+    }
+    if (line === range.start.line && char < range.start.character) {
+        return false;
+    }
+    if (line === range.end.line && char + length > range.end.character) {
+        return false;
+    }
+    return true;
+}
 
 // Workspace symbols handler
 connection.onWorkspaceSymbol((params: WorkspaceSymbolParams): SymbolInformation[] => {
@@ -897,136 +960,6 @@ connection.onCodeLens((params: CodeLensParams): CodeLens[] => {
     return [];
 });
 
-// Semantic tokens range handler
-connection.onRequest('textDocument/semanticTokens/range', (params: SemanticTokensRangeParams): SemanticTokens => {
-    try {
-        const document = documents.get(params.textDocument.uri);
-        if (!document) {
-            return { data: [] };
-        }
-        
-        const state = documentStates.get(params.textDocument.uri);
-        if (!state) {
-            return { data: [] };
-        }
-        
-        // For now, return full semantic tokens (can be optimized later to only return tokens in range)
-        const text = document.getText();
-        const tokens: number[] = [];
-        let prevLine = 0;
-        let prevChar = 0;
-        
-        // Use the same improved tokenization logic as full semantic tokens
-        const tokenPattern = /\d+(?:'?\p{L}+)?|\p{L}+(?:-\p{L}+)*|[(),.]|"[^"]*"/gu;
-        let match;
-        
-        // First pass: collect all tokens with positions
-        const allTokens: Array<{ token: string; start: number; line: number; char: number }> = [];
-        while ((match = tokenPattern.exec(text)) !== null) {
-            const token = match[0];
-            const start = match.index;
-            const textBefore = text.substring(0, start);
-            const linesBefore = textBefore.split('\n');
-            const line = linesBefore.length - 1;
-            const char = linesBefore[linesBefore.length - 1].length;
-            allTokens.push({ token, start, line, char });
-        }
-        
-        const range = params.range;
-        
-        // Second pass: check for multi-word type references and individual type words
-        for (let i = 0; i < allTokens.length; i++) {
-            const token = allTokens[i].token;
-            const start = allTokens[i].start;
-            const textBefore = text.substring(0, start);
-            const linesBefore = textBefore.split('\n');
-            const line = linesBefore.length - 1;
-            const char = linesBefore[linesBefore.length - 1].length;
-            
-            // Check if token is within requested range
-            if (line < range.start.line || line > range.end.line) {
-                continue;
-            }
-            if (line === range.start.line && char < range.start.character) {
-                continue;
-            }
-            if (line === range.end.line && char + token.length > range.end.character) {
-                continue;
-            }
-            
-            let tokenType: number | null = null;
-            
-            if (token.startsWith('"')) {
-                tokenType = 3; // string
-            } else if (/^\d/.test(token)) {
-                tokenType = 4; // number
-            } else if (state.keywords.has(token)) {
-                tokenType = 0; // keyword
-            } else {
-                // Check for multi-word type references (e.g., "öğe listesi")
-                let foundType = false;
-                
-                // Check 2-word phrases
-                if (i + 1 < allTokens.length) {
-                    const twoWord = `${token} ${allTokens[i + 1].token}`;
-                    if (state.types.has(twoWord)) {
-                        tokenType = 5; // type
-                        foundType = true;
-                    }
-                }
-                
-                // Check 3-word phrases
-                if (!foundType && i + 2 < allTokens.length) {
-                    const threeWord = `${token} ${allTokens[i + 1].token} ${allTokens[i + 2].token}`;
-                    if (state.types.has(threeWord)) {
-                        tokenType = 5; // type
-                        foundType = true;
-                    }
-                }
-                
-                // Check if this word is part of a type (e.g., "öğenin" -> "öğe" -> type)
-                if (!foundType) {
-                    // Check if word is a type reference (e.g., "öğenin" contains "öğe")
-                    for (const [typeWord, fullType] of state.typePhrases.entries()) {
-                        if (token.includes(typeWord) || typeWord.includes(token)) {
-                            // Check if it's a grammatical variation (Turkish genitive/accusative)
-                            const baseWord = typeWord.split(' ')[0]; // Get first word of type
-                            if (token.startsWith(baseWord) || baseWord.startsWith(token.substring(0, 3))) {
-                                tokenType = 5; // type
-                                foundType = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                
-                // Check single word types
-                if (!foundType && state.types.has(token)) {
-                    tokenType = 5; // type
-                } else if (!foundType && state.functions.has(token)) {
-                    tokenType = 1; // function
-                } else if (!foundType && (state.variables.has(token) || state.variableRefs.has(token))) {
-                    tokenType = 2; // variable (definition or reference)
-                }
-            }
-            
-            if (tokenType !== null) {
-                const deltaLine = line - prevLine;
-                const deltaChar = deltaLine === 0 ? char - prevChar : char;
-                
-                tokens.push(deltaLine, deltaChar, token.length, tokenType, 0);
-                
-                prevLine = line;
-                prevChar = char;
-            }
-        }
-        
-        return { data: tokens };
-    } catch (error) {
-        logError('Error in semanticTokens/range', error);
-        return { data: [] };
-    }
-});
 
 // Listen for document changes
 documents.listen(connection);
