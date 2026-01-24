@@ -175,6 +175,47 @@ export function activate(context: vscode.ExtensionContext) {
         if (lspClient) {
             context.subscriptions.push(lspClient);
             
+            // Intercept and filter output channel after client is created
+            setTimeout(() => {
+                try {
+                    const clientAny = lspClient as any;
+                    // Try multiple possible output channel locations
+                    const outputChannels = [
+                        clientAny._outputChannel,
+                        clientAny.outputChannel,
+                        clientAny._tracer?.outputChannel,
+                        (clientAny as any)._connection?.outputChannel
+                    ].filter(Boolean);
+                    
+                    outputChannels.forEach((channel: any) => {
+                        if (channel && typeof channel.append === 'function') {
+                            const originalAppend = channel.append.bind(channel);
+                            const originalAppendLine = channel.appendLine?.bind(channel);
+                            
+                            channel.append = function(value: string) {
+                                if (!value.includes('no handler for') && 
+                                    !value.includes('SMethod_SetTrace') && 
+                                    !value.includes('SMethod_Initialized')) {
+                                    originalAppend(value);
+                                }
+                            };
+                            
+                            if (originalAppendLine) {
+                                channel.appendLine = function(value: string) {
+                                    if (!value.includes('no handler for') && 
+                                        !value.includes('SMethod_SetTrace') && 
+                                        !value.includes('SMethod_Initialized')) {
+                                        originalAppendLine(value);
+                                    }
+                                };
+                            }
+                        }
+                    });
+                } catch (e) {
+                    // Ignore errors in output channel interception
+                }
+            }, 100);
+            
             lspClient.start().then(() => {
                 registerLSPProviders(context, kipSelector, lspClient!);
             }).catch((err) => {
