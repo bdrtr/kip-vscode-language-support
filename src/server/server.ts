@@ -602,8 +602,8 @@ connection.onRequest('textDocument/semanticTokens/full', (params: SemanticTokens
         
         const state = documentStates.get(params.textDocument.uri);
         if (!state) return { data: [] };
-    
-    const text = document.getText();
+        
+        const text = document.getText();
     const tokens: number[] = [];
     let prevLine = 0;
     let prevChar = 0;
@@ -694,7 +694,11 @@ connection.onRequest('textDocument/semanticTokens/full', (params: SemanticTokens
         }
     }
     
-    return { data: tokens };
+        return { data: tokens };
+    } catch (error) {
+        logError('Error in semanticTokens/full', error);
+        return { data: [] };
+    }
 });
 
 // Workspace symbols handler
@@ -752,9 +756,9 @@ connection.onRequest('textDocument/semanticTokens/range', (params: SemanticToken
         if (!state) {
             return { data: [] };
         }
-    
-    // For now, return full semantic tokens (can be optimized later to only return tokens in range)
-    const text = document.getText();
+        
+        // For now, return full semantic tokens (can be optimized later to only return tokens in range)
+        const text = document.getText();
     const tokens: number[] = [];
     let prevLine = 0;
     let prevChar = 0;
@@ -871,8 +875,6 @@ connection.onRequest('textDocument/semanticTokens/range', (params: SemanticToken
 documents.listen(connection);
 
 // Start server with error handling
-log('Starting server...');
-
 try {
     // Set up uncaught exception handler
     process.on('uncaughtException', (error) => {
