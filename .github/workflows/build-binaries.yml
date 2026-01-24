@@ -1,15 +1,17 @@
 name: Build Kip Binaries
 
 on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       release_tag:
         description: 'Release tag (e.g., v1.1.0)'
-        required: true
+        required: false
         type: string
-  push:
-    tags:
-      - 'v*'
 
 jobs:
   build:
@@ -110,15 +112,18 @@ jobs:
           path: ${{ matrix.binary_name }}
           retention-days: 90
 
-      - name: Get version from tag or input
+      - name: Get version from tag, input, or package.json
         id: get_version
         run: |
           if [ -n "${{ github.event.inputs.release_tag }}" ]; then
             VERSION="${{ github.event.inputs.release_tag }}"
           elif startsWith("${{ github.ref }}", "refs/tags/v"); then
             VERSION=${GITHUB_REF#refs/tags/v}
+            VERSION="v${VERSION}"
           else
-            VERSION="v1.1.0"
+            # Main branch push - package.json'dan versiyon al
+            VERSION=$(node -p "require('./package.json').version")
+            VERSION="v${VERSION}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=${VERSION#v}" >> $GITHUB_OUTPUT
