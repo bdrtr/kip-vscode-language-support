@@ -213,6 +213,7 @@ MIT License - detaylar için [LICENSE](LICENSE) dosyasına bakın.
 
 ## 🔗 Bağlantılar
 
+- **VS Code Marketplace:** [algorynth.kip-language](https://marketplace.visualstudio.com/items?itemName=algorynth.kip-language)
 - **Latest Release:** [GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases/latest)
 - **All Releases:** [GitHub Releases](https://github.com/algorynth/kip-vscode-language-support/releases)
 - **Kip Dili Repo:** [github.com/kip-dili/kip](https://github.com/kip-dili/kip)
