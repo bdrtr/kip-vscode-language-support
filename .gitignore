@@ -33,3 +33,4 @@ Thumbs.db
 test-example.kip
 TEST_REPORT.md
 *.test.kip
+test-lsp-detailed.kip
