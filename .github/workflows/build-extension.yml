@@ -8,6 +8,8 @@ on:
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
+  release:
+    types: [created]
 
 jobs:
   build:
@@ -41,20 +43,40 @@ jobs:
     - name: Package extension
       run: npm run package
       
+    - name: Get version from package.json
+      id: get_version
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+    
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
       with:
         name: kip-language-extension
         path: '*.vsix'
-        retention-days: 7
+        retention-days: 30
     
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/v')
+    - name: Create or Update Release
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
       uses: softprops/action-gh-release@v1
       with:
         files: '*.vsix'
-        generate_release_notes: true
+        tag_name: v${{ steps.get_version.outputs.version }}
+        name: Release v${{ steps.get_version.outputs.version }}
+        body: |
+          ## Changes
+          - Automated build from commit ${{ github.sha }}
+          - Built on ${{ github.event.head_commit.timestamp || github.run_started_at }}
+          
+          ## Installation
+          1. Download the `.vsix` file from Assets below
+          2. Open VS Code
+          3. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS)
+          4. Type "Extensions: Install from VSIX..."
+          5. Select the downloaded file
         draft: false
         prerelease: false
+        make_latest: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
