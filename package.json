@@ -136,7 +136,24 @@
                 "pattern": "**/*.kip",
                 "icon": "images/icon.png"
             }
-        ]
+        ],
+        "configurationDefaults": {
+            "[kip]": {
+                "editor.semanticHighlighting.enabled": true
+            },
+            "editor.semanticTokenColorCustomizations": {
+                "[*]": {
+                    "rules": {
+                        "keyword:kip": "#569CD6",
+                        "function:kip": "#DCDCAA",
+                        "variable:kip": "#9CDCFE",
+                        "type:kip": "#4EC9B0",
+                        "string:kip": "#CE9178",
+                        "number:kip": "#B5CEA8"
+                    }
+                }
+            }
+        }
     },
     "main": "./out/extension.js",
     "activationEvents": [
@@ -150,6 +167,7 @@
         "check": "node scripts/check-dependencies.js",
         "test": "node scripts/test-extension.js",
         "test:lsp": "node scripts/test-lsp-detailed.js",
+        "test:examples": "node scripts/test-examples-lsp.js",
         "test:comprehensive": "node scripts/comprehensive-test.js",
         "test:all": "npm run test && npm run test:lsp && npm run test:comprehensive",
         "validate": "node scripts/validate-vsix.js",

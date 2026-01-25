@@ -36,6 +36,7 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { parse, tokenize } from './parser';
+import { tokenize as lexerTokenize, KIP_KEYWORDS, KEYWORD_KINDS, type Token } from './lexer';
 import { 
     Program, 
     ASTVisitor, 
@@ -83,21 +84,165 @@ interface DocumentState {
     diagnostics: Diagnostic[];
     symbols: SymbolInformation[];
     functions: Set<string>;
+    functionDetails: Map<string, { parameters: string[]; isGerund: boolean; range: Range }>; // Function details
     types: Set<string>;
+    typeDetails: Map<string, { constructors: string[]; range: Range }>; // Type details
     typePhrases: Map<string, string>; // Maps type phrase to base type name
     variables: Set<string>; // Variable definitions (Defn statements)
+    variableDetails: Map<string, { range: Range }>; // Variable details
     variableRefs: Set<string>; // All variable references in expressions
     keywords: Set<string>;
 }
 
 const documentStates = new Map<string, DocumentState>();
 
-// Kip keywords
-const kipKeywords = new Set<string>([
-    'Bir', 'bir', 'ya', 'da', 'olabilir', 'var', 'olamaz',
-    'değilse', 'yazdır', 'diyelim', 'olsun', 'olarak', 'yerleşik',
-    'ise', 'ile', 'yükle', 'doğru', 'yanlış', 'doğruysa', 'yanlışsa', 'yokluksa'
-]);
+// Anahtar kelimeler tek kaynak: ra-kip kip-lexer token.rs
+
+/**
+ * Semantic token listesi (renklendirme).
+ * Kılavuz: https://github.com/kip-dili/kip/wiki/Kılavuz
+ *
+ * - Keyword, string, number: lexer TokenKind (token.rs ile aynı).
+ * - Tip/fonksiyon/değişken: AST (analyzeDocument) + Türkçe ek uyumu (isim halleri).
+ * - Çok kelimeli tipler: "öğe listesi", "uzunluk tam-sayısı" (Kılavuz: bazen boşluklu ifade).
+ */
+function emitSemanticTokens(
+    allTokens: Token[],
+    state: DocumentState,
+    range?: Range
+): number[] {
+    const out: number[] = [];
+    let prevLine = 0;
+    let prevChar = 0;
+    const marked = new Set<number>();
+
+    function inRange(t: Token): boolean {
+        if (!range) return true;
+        if (t.line < range.start.line || t.line > range.end.line) return false;
+        if (t.line === range.start.line && t.char + t.text.length < range.start.character) return false;
+        if (t.line === range.end.line && t.char > range.end.character) return false;
+        return true;
+    }
+
+    function push(line: number, char: number, len: number, type: number): void {
+        const dLine = line - prevLine;
+        const dChar = dLine === 0 ? char - prevChar : char;
+        out.push(dLine, dChar, len, type, 0);
+        prevLine = line;
+        prevChar = char;
+    }
+
+    const allVars = new Set([...state.variables, ...state.variableRefs]);
+    const turkishSuffix = /^[a-zA-ZçğıöşüÇĞİÖŞÜ]{1,6}$/;
+
+    for (let i = 0; i < allTokens.length; i++) {
+        if (marked.has(i)) continue;
+        const t = allTokens[i];
+        if (range && !inRange(t)) continue;
+
+        let tokenType: number | null = null;
+        let tokenLen = t.text.length;
+        const toMark = [i];
+
+        if (KEYWORD_KINDS.has(t.kind)) {
+            tokenType = 0;
+        } else if (t.kind === 'String') {
+            tokenType = 3;
+        } else if (t.kind === 'Float' || t.kind === 'Integer' || t.kind === 'IntegerWithSuffix') {
+            tokenType = 4;
+        } else if (t.kind === 'Ident') {
+            let found = false;
+            const text = t.text;
+
+            if (i + 1 < allTokens.length && allTokens[i + 1].kind === 'Ident') {
+                const n = allTokens[i + 1].text;
+                const two = `${text} ${n}`;
+                if (state.types.has(two)) {
+                    tokenType = 5;
+                    found = true;
+                    tokenLen = text.length + 1 + n.length;
+                    toMark.push(i + 1);
+                } else {
+                    for (const tn of state.types) {
+                        if (!tn.includes(' ')) continue;
+                        const [f, ...r] = tn.split(' ');
+                        const rest = r.join(' ');
+                        if (!text.startsWith(f) || !n.startsWith(rest)) continue;
+                        const s1 = text.slice(f.length);
+                        const s2 = n.slice(rest.length);
+                        if ((!s1 || turkishSuffix.test(s1)) && (!s2 || turkishSuffix.test(s2))) {
+                            tokenType = 5;
+                            found = true;
+                            tokenLen = text.length + 1 + n.length;
+                            toMark.push(i + 1);
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!found && i + 2 < allTokens.length &&
+                allTokens[i + 1].kind === 'Ident' && allTokens[i + 2].kind === 'Ident') {
+                const three = `${text} ${allTokens[i + 1].text} ${allTokens[i + 2].text}`;
+                if (state.types.has(three)) {
+                    tokenType = 5;
+                    found = true;
+                    tokenLen = text.length + 1 + allTokens[i + 1].text.length + 1 + allTokens[i + 2].text.length;
+                    toMark.push(i + 1, i + 2);
+                }
+            }
+            if (!found) {
+                if (state.types.has(text)) {
+                    tokenType = 5;
+                    found = true;
+                } else {
+                    for (const tn of state.types) {
+                        if (tn.includes(' ') || !text.startsWith(tn) || text.length <= tn.length) continue;
+                        if (turkishSuffix.test(text.slice(tn.length))) {
+                            tokenType = 5;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!found && state.functions.has(text)) {
+                tokenType = 1;
+                found = true;
+            }
+            if (!found) {
+                for (const fn of state.functions) {
+                    if (!text.startsWith(fn) || text.length <= fn.length) continue;
+                    if (turkishSuffix.test(text.slice(fn.length))) {
+                        tokenType = 1;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found && allVars.has(text)) {
+                tokenType = 2;
+                found = true;
+            }
+            if (!found) {
+                for (const vn of allVars) {
+                    if (!text.startsWith(vn) || text.length <= vn.length) continue;
+                    if (turkishSuffix.test(text.slice(vn.length))) {
+                        tokenType = 2;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (tokenType !== null) {
+            for (const j of toMark) marked.add(j);
+            push(t.line, t.char, tokenLen, tokenType);
+        }
+    }
+
+    return out;
+}
 
 // Semantic tokens legend
 const semanticTokensLegend: SemanticTokensLegend = {
@@ -217,9 +362,12 @@ function validateDocument(document: TextDocument): void {
             diagnostics,
             symbols: symbolsWithUri,
             functions: state.functions,
+            functionDetails: state.functionDetails,
             types: state.types,
+            typeDetails: state.typeDetails,
             typePhrases: state.typePhrases,
             variables: state.variables,
+            variableDetails: state.variableDetails,
             variableRefs: state.variableRefs,
             keywords: state.keywords
         });
@@ -240,9 +388,12 @@ function analyzeDocument(text: string): Omit<DocumentState, 'text' | 'diagnostic
     const ast = parse(text);
     
     const functions = new Set<string>();
+    const functionDetails = new Map<string, { parameters: string[]; isGerund: boolean; range: Range }>();
     const types = new Set<string>();
+    const typeDetails = new Map<string, { constructors: string[]; range: Range }>();
     const typePhrases = new Map<string, string>(); // Maps type phrase to base type name
     const variables = new Set<string>(); // Variables from Defn statements
+    const variableDetails = new Map<string, { range: Range }>();
     const variableRefs = new Set<string>(); // All variable references in expressions
     const symbols: SymbolInformation[] = [];
     
@@ -255,6 +406,10 @@ function analyzeDocument(text: string): Omit<DocumentState, 'text' | 'diagnostic
                 typePhrases.set(part, node.name);
             });
             typePhrases.set(node.name, node.name);
+            
+            // Store type details with constructor names
+            const constructors = node.constructors.map(c => c.name);
+            typeDetails.set(node.name, { constructors, range: node.range });
             
             symbols.push({
                 name: node.name,
@@ -272,6 +427,34 @@ function analyzeDocument(text: string): Omit<DocumentState, 'text' | 'diagnostic
                 functions.add(node.name + (node.name.endsWith('a') ? 'mak' : 'mek'));
             }
             
+            // Store function details
+            const parameters = node.parameters.map(p => p.name);
+            functionDetails.set(node.name, { parameters, isGerund: node.isGerund, range: node.range });
+            
+            // Visit function body if it exists (pattern matching)
+            if (node.body) {
+                const visitExpr = (expr: Expression, depth: number = 0) => {
+                    if (depth > 100) return;
+                    
+                    if (expr.type === 'VariableReference') {
+                        variableRefs.add((expr as VariableReference).name);
+                    } else if (expr.type === 'FunctionCall') {
+                        const call = expr as FunctionCall;
+                        variableRefs.add(call.functionName);
+                        call.arguments.forEach(arg => visitExpr(arg, depth + 1));
+                    } else if (expr.type === 'PatternMatch') {
+                        const match = expr as PatternMatch;
+                        visitExpr(match.value, depth + 1);
+                        match.patterns.forEach(pattern => {
+                            visitExpr(pattern.pattern, depth + 1);
+                            visitExpr(pattern.result, depth + 1);
+                        });
+                    }
+                };
+                
+                visitExpr(node.body, 0);
+            }
+            
             symbols.push({
                 name: node.name,
                 kind: SymbolKind.Function,
@@ -285,6 +468,7 @@ function analyzeDocument(text: string): Omit<DocumentState, 'text' | 'diagnostic
         visitVariableDefinition(node: VariableDefinition) {
             node.names.forEach(name => {
                 variables.add(name);
+                variableDetails.set(name, { range: node.range });
                 symbols.push({
                     name,
                     kind: SymbolKind.Variable,
@@ -357,7 +541,18 @@ function analyzeDocument(text: string): Omit<DocumentState, 'text' | 'diagnostic
     
     // Symbols are already created by AST visitor above
     
-    return { symbols, functions, types, typePhrases, variables, variableRefs, keywords: kipKeywords };
+    return { 
+        symbols, 
+        functions, 
+        functionDetails,
+        types, 
+        typeDetails,
+        typePhrases, 
+        variables, 
+        variableDetails,
+        variableRefs, 
+        keywords: KIP_KEYWORDS 
+    };
 }
 
 // Completion handler
@@ -414,7 +609,7 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     }
 });
 
-// Hover handler
+// Hover handler - provides detailed information about identifiers
 connection.onHover((params: TextDocumentPositionParams): Hover | null => {
     try {
         const document = documents.get(params.textDocument.uri);
@@ -427,47 +622,159 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
         const text = document.getText();
         const lines = text.split('\n');
         const line = lines[position.line] || '';
-        const wordRange = getWordAtPosition(line, position.character);
         
+        // Try to find word at position (handle Turkish suffixes)
+        const wordRange = getWordAtPosition(line, position.character);
         if (!wordRange) return null;
         
-        const word = line.substring(wordRange.start, wordRange.end);
+        let word = line.substring(wordRange.start, wordRange.end);
         
-        let content: MarkupContent | null = null;
+        // Check for Turkish suffixes and find base identifier
+        let baseWord = word;
+        let foundIdentifier: string | null = null;
+        let identifierType: 'function' | 'type' | 'variable' | 'keyword' | null = null;
         
-        if (state.functions.has(word)) {
-            content = {
-                kind: MarkupKind.Markdown,
-                value: `**Function:** ${word}`
-            };
-        } else if (state.types.has(word)) {
-            content = {
-                kind: MarkupKind.Markdown,
-                value: `**Type:** ${word}`
-            };
-        } else if (state.variables.has(word)) {
-            content = {
-                kind: MarkupKind.Markdown,
-                value: `**Variable:** ${word}`
-            };
-        } else if (state.keywords.has(word)) {
-            content = {
-                kind: MarkupKind.Markdown,
-                value: `**Keyword:** ${word}`
-            };
-        }
-        
-        if (content) {
-            return {
-                contents: content,
-                range: {
-                    start: { line: position.line, character: wordRange.start },
-                    end: { line: position.line, character: wordRange.end }
+        // Check functions
+        for (const funcName of state.functions) {
+            if (word === funcName || (word.startsWith(funcName) && word.length > funcName.length)) {
+                const suffix = word.substring(funcName.length);
+                if (/^[a-zA-ZçğıöşüÇĞİÖŞÜ]{1,6}$/.test(suffix)) {
+                    foundIdentifier = funcName;
+                    identifierType = 'function';
+                    baseWord = funcName;
+                    break;
                 }
-            };
+            }
         }
         
-        return null;
+        // Check types
+        if (!foundIdentifier) {
+            for (const typeName of state.types) {
+                if (word === typeName || (word.startsWith(typeName) && word.length > typeName.length)) {
+                    const suffix = word.substring(typeName.length);
+                    if (/^[a-zA-ZçğıöşüÇĞİÖŞÜ]{1,6}$/.test(suffix)) {
+                        foundIdentifier = typeName;
+                        identifierType = 'type';
+                        baseWord = typeName;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Check variables
+        if (!foundIdentifier) {
+            const allVars = new Set([...state.variables, ...state.variableRefs]);
+            for (const varName of allVars) {
+                if (word === varName || (word.startsWith(varName) && word.length > varName.length)) {
+                    const suffix = word.substring(varName.length);
+                    if (/^[a-zA-ZçğıöşüÇĞİÖŞÜ]{1,6}$/.test(suffix)) {
+                        foundIdentifier = varName;
+                        identifierType = 'variable';
+                        baseWord = varName;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Check exact matches
+        if (!foundIdentifier) {
+            if (state.functions.has(word)) {
+                foundIdentifier = word;
+                identifierType = 'function';
+            } else if (state.types.has(word)) {
+                foundIdentifier = word;
+                identifierType = 'type';
+            } else if (state.variables.has(word) || state.variableRefs.has(word)) {
+                foundIdentifier = word;
+                identifierType = 'variable';
+            } else if (state.keywords.has(word)) {
+                foundIdentifier = word;
+                identifierType = 'keyword';
+            }
+        }
+        
+        if (!foundIdentifier || !identifierType) return null;
+        
+        // Build detailed hover content
+        let markdown = '';
+        
+        if (identifierType === 'function') {
+            const funcDetail = state.functionDetails.get(foundIdentifier);
+            markdown = `### 🔧 Function: \`${foundIdentifier}\`\n\n`;
+            
+            if (funcDetail) {
+                if (funcDetail.parameters.length > 0) {
+                    markdown += `**Parametreler:** ${funcDetail.parameters.join(', ')}\n\n`;
+                }
+                if (funcDetail.isGerund) {
+                    markdown += `**Tip:** Gerund (fiilimsi)\n\n`;
+                }
+            }
+            
+            markdown += `**Kullanım Örneği:**\n\`\`\`kip\n(${funcDetail?.parameters.join(' ') || 'argümanlar'}) ${foundIdentifier},\n\`\`\`\n\n`;
+            markdown += `*Fonksiyon tanımına gitmek için Ctrl+Click kullanın.*`;
+            
+        } else if (identifierType === 'type') {
+            const typeDetail = state.typeDetails.get(foundIdentifier);
+            markdown = `### 📦 Type: \`${foundIdentifier}\`\n\n`;
+            
+            if (typeDetail && typeDetail.constructors.length > 0) {
+                markdown += `**Yapıcılar:** ${typeDetail.constructors.join(', ')}\n\n`;
+            }
+            
+            markdown += `**Kullanım Örneği:**\n\`\`\`kip\nBir ${foundIdentifier} ya\n  ${typeDetail?.constructors[0] || 'değer1'},\n  ${typeDetail?.constructors[1] || 'değer2'}\nolabilir.\n\`\`\`\n\n`;
+            markdown += `*Tip tanımına gitmek için Ctrl+Click kullanın.*`;
+            
+        } else if (identifierType === 'variable') {
+            const varDetail = state.variableDetails.get(foundIdentifier);
+            markdown = `### 📝 Variable: \`${foundIdentifier}\`\n\n`;
+            
+            if (state.variables.has(foundIdentifier)) {
+                markdown += `**Tanım:** Bu değişken bu dosyada tanımlanmıştır.\n\n`;
+            } else {
+                markdown += `**Referans:** Bu değişkene bir referans.\n\n`;
+            }
+            
+            markdown += `**Kullanım Örneği:**\n\`\`\`kip\n${foundIdentifier} diyelim\n\`\`\`\n\n`;
+            markdown += `*Değişken tanımına gitmek için Ctrl+Click kullanın.*`;
+            
+        } else if (identifierType === 'keyword') {
+            markdown = `### 🔑 Keyword: \`${foundIdentifier}\`\n\n`;
+            
+            // Add keyword-specific documentation
+            const keywordDocs: Record<string, string> = {
+                'Bir': 'Tip tanımı başlatır. "Bir X ya ... olabilir" formatında kullanılır.',
+                'bir': 'Tip tanımı başlatır (küçük harf).',
+                'ya': 'Tip yapıcılarını ayırır.',
+                'da': '"ya ... da" yapısında kullanılır.',
+                'olabilir': 'Tip tanımını bitirir.',
+                'var': 'Değer kontrolü yapar.',
+                'olamaz': 'Negatif kontrol yapar.',
+                'değilse': 'Koşullu ifade için kullanılır.',
+                'yazdır': 'Çıktı fonksiyonu.',
+                'diyelim': 'Değişken tanımlama.',
+                'olsun': 'Değer atama.',
+                'olarak': 'Tip dönüşümü.',
+                'yerleşik': 'Yerleşik fonksiyon tanımı.'
+            };
+            
+            if (keywordDocs[foundIdentifier]) {
+                markdown += `**Açıklama:** ${keywordDocs[foundIdentifier]}\n\n`;
+            }
+        }
+        
+        return {
+            contents: {
+                kind: MarkupKind.Markdown,
+                value: markdown
+            },
+            range: {
+                start: { line: position.line, character: wordRange.start },
+                end: { line: position.line, character: wordRange.end }
+            }
+        };
     } catch (error) {
         logError(`Error in onHover: ${params.textDocument.uri}`, error);
         return null;
@@ -616,306 +923,34 @@ connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] =
     }
 });
 
-// Semantic tokens handler - follows original Kip LSP logic
-// Original: extractSemanticTokens processes statements and finds all occurrences of identifiers
+// Semantic tokens: lexer (orijinal token.rs) + AST. Anahtar kelimeler ve tipler tek kaynaktan.
 connection.onRequest('textDocument/semanticTokens/full', (params: SemanticTokensParams): SemanticTokens => {
     try {
         const document = documents.get(params.textDocument.uri);
         if (!document) return { data: [] };
-        
         const state = documentStates.get(params.textDocument.uri);
         if (!state) return { data: [] };
-        
-        const text = document.getText();
-        const tokens: number[] = [];
-        let prevLine = 0;
-        let prevChar = 0;
-        
-        // Find all occurrences of identifiers (like original findAllOccurrences)
-        // Process in order: types, functions, variables, keywords
-        const allIdentifiers: Array<{ name: string; type: number; positions: Array<{ line: number; char: number; length: number }> }> = [];
-        
-        // Collect all type occurrences (including multi-word types)
-        // Process multi-word types first to avoid partial matches
-        const sortedTypes = Array.from(state.types).sort((a, b) => b.length - a.length); // Longer first
-        for (const typeName of sortedTypes) {
-            const positions = findAllOccurrences(text, typeName);
-            if (positions.length > 0) {
-                allIdentifiers.push({ name: typeName, type: 5, positions });
-            }
-        }
-        
-        // Also handle type phrase parts (e.g., "öğe" from "öğe listesi")
-        // But only if they're not already covered by full type name
-        for (const [typeWord, fullType] of state.typePhrases.entries()) {
-            // Only process if the full type wasn't found or if this is a grammatical variation
-            if (!state.types.has(typeWord)) {
-                // Find occurrences that might be grammatical variations
-                const positions = findAllOccurrences(text, typeWord);
-                // Filter to only include positions that aren't already covered by full type
-                const filteredPositions = positions.filter(pos => {
-                    // Check if this position is already covered by a full type occurrence
-                    return !allIdentifiers.some(ident => 
-                        ident.type === 5 && ident.positions.some(p => 
-                            p.line === pos.line && 
-                            Math.abs(p.char - pos.char) < 5 // Close positions
-                        )
-                    );
-                });
-                if (filteredPositions.length > 0) {
-                    allIdentifiers.push({ name: typeWord, type: 5, positions: filteredPositions });
-                }
-            }
-        }
-        
-        // Collect all function occurrences
-        for (const funcName of state.functions) {
-            const positions = findAllOccurrences(text, funcName);
-            if (positions.length > 0) {
-                allIdentifiers.push({ name: funcName, type: 1, positions });
-            }
-        }
-        
-        // Collect all variable occurrences (definitions and references)
-        const allVars = new Set([...state.variables, ...state.variableRefs]);
-        for (const varName of allVars) {
-            // Skip if already marked as type or function
-            if (!state.types.has(varName) && !state.functions.has(varName)) {
-                const positions = findAllOccurrences(text, varName);
-                if (positions.length > 0) {
-                    allIdentifiers.push({ name: varName, type: 2, positions });
-                }
-            }
-        }
-        
-        // Collect keyword occurrences
-        for (const keyword of state.keywords) {
-            const positions = findAllOccurrences(text, keyword);
-            if (positions.length > 0) {
-                allIdentifiers.push({ name: keyword, type: 0, positions });
-            }
-        }
-        
-        // Collect string and number literals
-        const stringPattern = /"[^"]*"/g;
-        let match;
-        while ((match = stringPattern.exec(text)) !== null) {
-            const start = match.index;
-            const textBefore = text.substring(0, start);
-            const linesBefore = textBefore.split('\n');
-            const line = linesBefore.length - 1;
-            const char = linesBefore[linesBefore.length - 1].length;
-            allIdentifiers.push({
-                name: match[0],
-                type: 3,
-                positions: [{ line, char, length: match[0].length }]
-            });
-        }
-        
-        const numberPattern = /\d+(?:'?\p{L}+)?/gu;
-        while ((match = numberPattern.exec(text)) !== null) {
-            const start = match.index;
-            const textBefore = text.substring(0, start);
-            const linesBefore = textBefore.split('\n');
-            const line = linesBefore.length - 1;
-            const char = linesBefore[linesBefore.length - 1].length;
-            allIdentifiers.push({
-                name: match[0],
-                type: 4,
-                positions: [{ line, char, length: match[0].length }]
-            });
-        }
-        
-        // Sort all positions by line and character
-        const allPositions: Array<{ line: number; char: number; length: number; type: number }> = [];
-        for (const ident of allIdentifiers) {
-            for (const pos of ident.positions) {
-                allPositions.push({ ...pos, type: ident.type });
-            }
-        }
-        
-        // Sort by position (line, then char)
-        allPositions.sort((a, b) => {
-            if (a.line !== b.line) return a.line - b.line;
-            return a.char - b.char;
-        });
-        
-        // Build semantic tokens array (delta encoding)
-        for (const pos of allPositions) {
-            const deltaLine = pos.line - prevLine;
-            const deltaChar = deltaLine === 0 ? pos.char - prevChar : pos.char;
-            
-            tokens.push(deltaLine, deltaChar, pos.length, pos.type, 0);
-            
-            prevLine = pos.line;
-            prevChar = pos.char;
-        }
-        
-        return { data: tokens };
+        const allTokens = lexerTokenize(document.getText());
+        return { data: emitSemanticTokens(allTokens, state) };
     } catch (error) {
         logError('Error in semanticTokens/full', error);
         return { data: [] };
     }
 });
 
-// Helper function to find all occurrences of a string in text (like original findAllOccurrences)
-function findAllOccurrences(text: string, needle: string): Array<{ line: number; char: number; length: number }> {
-    const positions: Array<{ line: number; char: number; length: number }> = [];
-    let offset = 0;
-    
-    while (true) {
-        const index = text.indexOf(needle, offset);
-        if (index === -1) break;
-        
-        const textBefore = text.substring(0, index);
-        const linesBefore = textBefore.split('\n');
-        const line = linesBefore.length - 1;
-        const char = linesBefore[linesBefore.length - 1].length;
-        
-        positions.push({ line, char, length: needle.length });
-        
-        offset = index + needle.length;
-    }
-    
-    return positions;
-}
-
-// Semantic tokens range handler - uses same logic as full but filters by range
 connection.onRequest('textDocument/semanticTokens/range', (params: SemanticTokensRangeParams): SemanticTokens => {
     try {
         const document = documents.get(params.textDocument.uri);
-        if (!document) {
-            return { data: [] };
-        }
-        
+        if (!document) return { data: [] };
         const state = documentStates.get(params.textDocument.uri);
-        if (!state) {
-            return { data: [] };
-        }
-        
-        const text = document.getText();
-        const range = params.range;
-        const tokens: number[] = [];
-        let prevLine = 0;
-        let prevChar = 0;
-        
-        // Find all occurrences (same as full)
-        const allIdentifiers: Array<{ name: string; type: number; positions: Array<{ line: number; char: number; length: number }> }> = [];
-        
-        for (const typeName of state.types) {
-            const positions = findAllOccurrences(text, typeName).filter(pos => 
-                isPositionInRange(pos.line, pos.char, pos.length, range)
-            );
-            if (positions.length > 0) {
-                allIdentifiers.push({ name: typeName, type: 5, positions });
-            }
-        }
-        
-        for (const funcName of state.functions) {
-            const positions = findAllOccurrences(text, funcName).filter(pos => 
-                isPositionInRange(pos.line, pos.char, pos.length, range)
-            );
-            if (positions.length > 0) {
-                allIdentifiers.push({ name: funcName, type: 1, positions });
-            }
-        }
-        
-        const allVars = new Set([...state.variables, ...state.variableRefs]);
-        for (const varName of allVars) {
-            if (!state.types.has(varName) && !state.functions.has(varName)) {
-                const positions = findAllOccurrences(text, varName).filter(pos => 
-                    isPositionInRange(pos.line, pos.char, pos.length, range)
-                );
-                if (positions.length > 0) {
-                    allIdentifiers.push({ name: varName, type: 2, positions });
-                }
-            }
-        }
-        
-        for (const keyword of state.keywords) {
-            const positions = findAllOccurrences(text, keyword).filter(pos => 
-                isPositionInRange(pos.line, pos.char, pos.length, range)
-            );
-            if (positions.length > 0) {
-                allIdentifiers.push({ name: keyword, type: 0, positions });
-            }
-        }
-        
-        const stringPattern = /"[^"]*"/g;
-        let match;
-        while ((match = stringPattern.exec(text)) !== null) {
-            const start = match.index;
-            const textBefore = text.substring(0, start);
-            const linesBefore = textBefore.split('\n');
-            const line = linesBefore.length - 1;
-            const char = linesBefore[linesBefore.length - 1].length;
-            if (isPositionInRange(line, char, match[0].length, range)) {
-                allIdentifiers.push({
-                    name: match[0],
-                    type: 3,
-                    positions: [{ line, char, length: match[0].length }]
-                });
-            }
-        }
-        
-        const numberPattern = /\d+(?:'?\p{L}+)?/gu;
-        while ((match = numberPattern.exec(text)) !== null) {
-            const start = match.index;
-            const textBefore = text.substring(0, start);
-            const linesBefore = textBefore.split('\n');
-            const line = linesBefore.length - 1;
-            const char = linesBefore[linesBefore.length - 1].length;
-            if (isPositionInRange(line, char, match[0].length, range)) {
-                allIdentifiers.push({
-                    name: match[0],
-                    type: 4,
-                    positions: [{ line, char, length: match[0].length }]
-                });
-            }
-        }
-        
-        const allPositions: Array<{ line: number; char: number; length: number; type: number }> = [];
-        for (const ident of allIdentifiers) {
-            for (const pos of ident.positions) {
-                allPositions.push({ ...pos, type: ident.type });
-            }
-        }
-        
-        allPositions.sort((a, b) => {
-            if (a.line !== b.line) return a.line - b.line;
-            return a.char - b.char;
-        });
-        
-        for (const pos of allPositions) {
-            const deltaLine = pos.line - prevLine;
-            const deltaChar = deltaLine === 0 ? pos.char - prevChar : pos.char;
-            
-            tokens.push(deltaLine, deltaChar, pos.length, pos.type, 0);
-            
-            prevLine = pos.line;
-            prevChar = pos.char;
-        }
-        
-        return { data: tokens };
+        if (!state) return { data: [] };
+        const allTokens = lexerTokenize(document.getText());
+        return { data: emitSemanticTokens(allTokens, state, params.range) };
     } catch (error) {
         logError('Error in semanticTokens/range', error);
         return { data: [] };
     }
 });
-
-// Helper to check if position is within range
-function isPositionInRange(line: number, char: number, length: number, range: Range): boolean {
-    if (line < range.start.line || line > range.end.line) {
-        return false;
-    }
-    if (line === range.start.line && char < range.start.character) {
-        return false;
-    }
-    if (line === range.end.line && char + length > range.end.character) {
-        return false;
-    }
-    return true;
-}
 
 // Workspace symbols handler
 connection.onWorkspaceSymbol((params: WorkspaceSymbolParams): SymbolInformation[] => {

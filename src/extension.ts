@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { KipRunner } from './kipRunner';
-import { KipHoverProvider } from './hoverProvider';
+// KipHoverProvider removed - LSP client handles hover automatically
 import { KipCompletionProvider } from './completionProvider';
 import { KipFormattingProvider } from './formattingProvider';
 import { KipDiagnosticProvider } from './diagnosticProvider';
@@ -216,14 +216,9 @@ function registerLSPProviders(
             })
         );
         
-        // Hover Provider - Sadece LSP kullanır
-        if (KipHoverProvider) {
-            const hoverProvider = vscode.languages.registerHoverProvider(
-                kipSelector,
-                new KipHoverProvider(lspClient)
-            );
-            context.subscriptions.push(hoverProvider);
-        }
+        // Hover Provider - LSP client otomatik olarak handle ediyor, client-side provider'a gerek yok
+        // Client-side hover provider kaldırıldı çünkü LSP client zaten hover'ı sağlıyor
+        // İkisi birlikte çalışınca 2 tane kutu çıkıyor
         
         // Completion Provider
         if (KipCompletionProvider) {
