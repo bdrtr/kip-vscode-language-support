@@ -155,6 +155,8 @@ You can configure the extension in VS Code settings (`Ctrl+,` / `Cmd+,`):
 
 This extension is open source and community-maintained. Contributions are welcome!
 
+> **Important:** Run all npm commands from the **`kip-vscode-language-support`** directory. If the repo is a subfolder (e.g. monorepo or `git pull` into a workspace), run `cd kip-vscode-language-support` first. Running from the parent causes `rootDir` / "file is not under 'rootDir'" TypeScript errors.
+
 #### Prerequisites
 - Node.js 20+
 - npm
@@ -170,20 +172,21 @@ cd kip-vscode-language-support
 # Install dependencies
 npm install
 
-# Compile TypeScript
+# Compile TypeScript (veya: npm run build)
 npm run compile
 ```
 
 #### Development Workflow
 ```bash
-# Watch mode (auto-compile on changes)
-npm run watch
+# Derleme
+npm run build          # = npm run compile
+npm run watch          # watch mode
 
-# Run tests
+# Testler
 npm test
 npm run test:lsp
 
-# Package extension
+# VSIX paketle
 npm run package
 ```
 

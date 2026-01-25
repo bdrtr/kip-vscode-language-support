@@ -15,7 +15,8 @@
     "homepage": "https://github.com/kip-dili/kip#readme",
     "license": "MIT",
     "engines": {
-        "vscode": "^1.80.0"
+        "vscode": "^1.80.0",
+        "node": ">=20.0.0"
     },
     "categories": [
         "Programming Languages"
@@ -158,8 +159,9 @@
     "main": "./out/extension.js",
     "scripts": {
         "vscode:prepublish": "npm run compile",
-        "compile": "tsc -p ./",
-        "watch": "tsc -watch -p ./",
+        "compile": "tsc -p .",
+        "build": "npm run compile",
+        "watch": "tsc -watch -p .",
         "lint": "eslint src --ext ts",
         "check": "node scripts/check-dependencies.js",
         "test": "node scripts/test-extension.js",
@@ -169,7 +171,8 @@
         "test:all": "npm run test && npm run test:lsp && npm run test:comprehensive",
         "validate": "node scripts/validate-vsix.js",
         "quick-check": "bash scripts/quick-check.sh",
-        "package": "npm run compile && vsce package",
+        "package": "node scripts/check-node-version.js && npm run compile && vsce package && node scripts/fix-vsix-zip.js",
+        "fix-vsix": "node scripts/fix-vsix-zip.js",
         "release:patch": "node scripts/release.js patch",
         "release:minor": "node scripts/release.js minor",
         "release:major": "node scripts/release.js major"
