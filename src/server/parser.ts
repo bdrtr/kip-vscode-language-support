@@ -23,7 +23,7 @@ import {
     createPosition,
     ASTNode
 } from './ast';
-import { analyzeMorphology, findBaseIdentifier, extractCase, Case } from './morphology';
+import { analyzeMorphology, findBaseIdentifier, extractCase, Case, type MorphologyResult } from './morphology';
 import { tokenize as lexerTokenize, KIP_KEYWORDS, type Token } from './lexer';
 
 /** Orijinal kip-lexer ile uyumlu tokenize; parser ve LSP aynı çıktıyı kullanır. */
@@ -574,7 +574,7 @@ function parseFunctionBody(tokens: Token[], startIndex: number): { node: Pattern
         if (i < tokens.length && /^\p{L}/u.test(tokens[i].token)) {
             const token = tokens[i].token;
             const analyses = analyzeMorphology(token);
-            const condAnalysis = analyses.find(a => a.case === Case.Cond);
+            const condAnalysis = analyses.find((a: MorphologyResult) => a.case === Case.Cond);
             
             if (condAnalysis) {
                 // Pattern like "boşsa" -> pattern is "boş"
